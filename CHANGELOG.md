@@ -10,3 +10,4 @@ All notable changes to this project will be documented in this file.
 - Rear camera selected by default at application startup.
 - Vertical three-dot options menu with front camera, rear camera and application exit actions.
 - Runtime camera permission handling.
+
