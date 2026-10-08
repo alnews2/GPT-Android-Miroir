@@ -53,6 +53,7 @@ class RtspStreamManager(
         if (selectedCamera == selection) return
         detachPreview(selectedCamera)
         selectedCamera = selection
+        lastError = null
         if (previewSurfaceReady) attachPreview(selection)
     }
 
@@ -113,10 +114,19 @@ class RtspStreamManager(
             ) {
                 "encodeur H.264 indisponible"
             }
+            // Select the requested camera explicitly before starting the background stream.
+            stream.startPreview(
+                if (selection == CameraSelection.FRONT) {
+                    CameraHelper.Facing.FRONT
+                } else {
+                    CameraHelper.Facing.BACK
+                },
+                configuration.width,
+                configuration.height,
+                configuration.fps,
+                rotation
+            )
             stream.getStreamClient().setOnlyVideo(true)
-            if (selection == CameraSelection.FRONT) {
-                stream.switchCamera()
-            }
             stream.startStream()
             stream
         }.onFailure { error ->
@@ -130,7 +140,10 @@ class RtspStreamManager(
         val stream = when (selection) {
             CameraSelection.REAR -> rearStream
             CameraSelection.FRONT -> frontStream
-        } ?: return
+        } ?: run {
+            lastError = selection.name.lowercase() + ": flux RTSP non disponible"
+            return
+        }
 
         runCatching {
             stream.replaceView(previewView)
