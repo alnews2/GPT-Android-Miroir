@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- correction de la sélection explicite de la caméra avant/arrière pour les flux RTSP et affichage d'une erreur si le flux sélectionné n'est pas disponible.
 
 ### Added
 - Initial Android application foundation using Kotlin, Jetpack Compose and Material 3.
