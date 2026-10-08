@@ -1,6 +1,7 @@
 package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
+import android.view.SurfaceHolder
 import com.pedro.common.ConnectChecker
 import com.pedro.encoder.input.video.CameraHelper
 import com.pedro.library.view.OpenGlView
@@ -13,15 +14,24 @@ class RtspStreamManager(
 ) {
     private var rearStream: RtspServerCamera2? = null
     private var frontStream: RtspServerCamera2? = null
+    private var configuration: RtspConfiguration? = null
+    private var rearSurfaceReady = false
+    private var frontSurfaceReady = false
 
     var lastError: String? = null
         private set
 
+    init {
+        rearView.holder.addCallback(surfaceCallback(CameraSelection.REAR))
+        frontView.holder.addCallback(surfaceCallback(CameraSelection.FRONT))
+    }
+
     fun start(configuration: RtspConfiguration) {
         stop()
         lastError = null
-        if (configuration.rearEnabled) rearStream = createStream(CameraSelection.REAR, configuration.rearPort, rearView, configuration)
-        if (configuration.frontEnabled) frontStream = createStream(CameraSelection.FRONT, configuration.frontPort, frontView, configuration)
+        this.configuration = configuration
+        tryStart(CameraSelection.REAR)
+        tryStart(CameraSelection.FRONT)
     }
 
     fun stop() {
@@ -29,6 +39,7 @@ class RtspStreamManager(
         runCatching { frontStream?.stopStream() }
         rearStream = null
         frontStream = null
+        configuration = null
     }
 
     fun isRunning(selection: CameraSelection): Boolean = when (selection) {
@@ -41,19 +52,106 @@ class RtspStreamManager(
         CameraSelection.FRONT -> frontStream?.getStreamClient()?.getEndPointConnection()
     }
 
-    private fun createStream(selection: CameraSelection, port: Int, view: OpenGlView, configuration: RtspConfiguration): RtspServerCamera2? {
+    private fun surfaceCallback(selection: CameraSelection) = object : SurfaceHolder.Callback {
+        override fun surfaceCreated(holder: SurfaceHolder) {
+            setSurfaceReady(selection, true)
+            tryStart(selection)
+        }
+
+        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            if (holder.surface.isValid) {
+                setSurfaceReady(selection, true)
+                tryStart(selection)
+            }
+        }
+
+        override fun surfaceDestroyed(holder: SurfaceHolder) {
+            setSurfaceReady(selection, false)
+            stop(selection)
+        }
+    }
+
+    private fun setSurfaceReady(selection: CameraSelection, ready: Boolean) {
+        when (selection) {
+            CameraSelection.REAR -> rearSurfaceReady = ready
+            CameraSelection.FRONT -> frontSurfaceReady = ready
+        }
+    }
+
+    private fun tryStart(selection: CameraSelection) {
+        val currentConfiguration = configuration ?: return
+        val surfaceReady = when (selection) {
+            CameraSelection.REAR -> rearSurfaceReady
+            CameraSelection.FRONT -> frontSurfaceReady
+        }
+        if (!surfaceReady || !isEnabled(selection, currentConfiguration) || isRunning(selection)) return
+
+        val view = when (selection) {
+            CameraSelection.REAR -> rearView
+            CameraSelection.FRONT -> frontView
+        }
+        val port = when (selection) {
+            CameraSelection.REAR -> currentConfiguration.rearPort
+            CameraSelection.FRONT -> currentConfiguration.frontPort
+        }
+
+        createStream(selection, port, view, currentConfiguration)?.let { stream ->
+            when (selection) {
+                CameraSelection.REAR -> rearStream = stream
+                CameraSelection.FRONT -> frontStream = stream
+            }
+        }
+    }
+
+    private fun isEnabled(selection: CameraSelection, configuration: RtspConfiguration): Boolean =
+        when (selection) {
+            CameraSelection.REAR -> configuration.rearEnabled
+            CameraSelection.FRONT -> configuration.frontEnabled
+        }
+
+    private fun stop(selection: CameraSelection) {
+        when (selection) {
+            CameraSelection.REAR -> {
+                runCatching { rearStream?.stopStream() }
+                rearStream = null
+            }
+            CameraSelection.FRONT -> {
+                runCatching { frontStream?.stopStream() }
+                frontStream = null
+            }
+        }
+    }
+
+    private fun createStream(
+        selection: CameraSelection,
+        port: Int,
+        view: OpenGlView,
+        configuration: RtspConfiguration
+    ): RtspServerCamera2? {
         return runCatching {
             val stream = RtspServerCamera2(view, checker(selection), port)
             val rotation = CameraHelper.getCameraOrientation(context)
-            check(stream.prepareVideo(configuration.width, configuration.height, configuration.fps, configuration.bitrate, 2, rotation)) {
+            check(
+                stream.prepareVideo(
+                    configuration.width,
+                    configuration.height,
+                    configuration.fps,
+                    configuration.bitrate,
+                    2,
+                    rotation
+                )
+            ) {
                 "encodeur H.264 indisponible"
             }
             stream.getStreamClient().setOnlyVideo(true)
-            if (selection == CameraSelection.FRONT) stream.switchCamera()
+            if (selection == CameraSelection.FRONT) {
+                stream.switchCamera()
+            }
             stream.startStream()
             stream
         }.onFailure { error ->
-            lastError = selection.name.lowercase() + ": " + (error.message ?: "échec du démarrage RTSP")
+            lastError = selection.name.lowercase() + ": " +
+                (error.message ?: "échec du démarrage RTSP")
         }.getOrNull()
     }
 
