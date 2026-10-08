@@ -16,6 +16,7 @@ class RtspStreamManager(
     private var configuration: RtspConfiguration? = null
     private var selectedCamera = CameraSelection.REAR
     private var previewSurfaceReady = false
+    private var concurrentMode = false
 
     var lastError: String? = null
         private set
@@ -46,37 +47,45 @@ class RtspStreamManager(
         lastError = null
         this.configuration = configuration
 
-        if (configuration.rearEnabled && configuration.frontEnabled &&
-            !cameraController.isConcurrentSupported()
-        ) {
-            lastError =
-                "Ce téléphone ne prend pas en charge la capture simultanée des caméras avant et arrière."
-            return
+        concurrentMode = configuration.rearEnabled &&
+            configuration.frontEnabled &&
+            cameraController.isConcurrentSupported()
+
+        if (concurrentMode) {
+            createStreams(configuration)
+        } else {
+            // Fallback for phones that cannot capture both cameras simultaneously.
+            createSelectedStream(configuration)
         }
 
-        createStreams(configuration)
         lastError = cameraController.lastError ?: lastError
         if (previewSurfaceReady) attachPreview(selectedCamera)
     }
 
     fun selectCamera(selection: CameraSelection) {
-        if (selectedCamera == selection) return
+        if (selectedCamera == selection && (concurrentMode || streamFor(selection) != null)) {
+            return
+        }
+
         detachPreview(selectedCamera)
         selectedCamera = selection
         lastError = null
-        attachPreview(selection)
+
+        if (!concurrentMode) {
+            stopSelectedStream()
+            configuration?.let { createSelectedStream(it) }
+        }
+
+        if (previewSurfaceReady) attachPreview(selection)
         lastError = cameraController.lastError ?: lastError
     }
 
     fun stop() {
         detachPreview(selectedCamera)
-        runCatching { rearStream?.stopStream() }
-        runCatching { frontStream?.stopStream() }
-        runCatching { rearStream?.release() }
-        runCatching { frontStream?.release() }
-        rearStream = null
-        frontStream = null
+        stopStream(CameraSelection.REAR)
+        stopStream(CameraSelection.FRONT)
         configuration = null
+        concurrentMode = false
         cameraController.close()
     }
 
@@ -88,6 +97,32 @@ class RtspStreamManager(
     fun endpoint(selection: CameraSelection): String? = when (selection) {
         CameraSelection.REAR -> rearStream?.getStreamClient()?.getEndPointConnection()
         CameraSelection.FRONT -> frontStream?.getStreamClient()?.getEndPointConnection()
+    }
+
+    private fun createSelectedStream(configuration: RtspConfiguration) {
+        val enabled = when (selectedCamera) {
+            CameraSelection.REAR -> configuration.rearEnabled
+            CameraSelection.FRONT -> configuration.frontEnabled
+        }
+
+        if (!enabled) {
+            lastError = when (selectedCamera) {
+                CameraSelection.REAR -> "Le flux caméra arrière est désactivé."
+                CameraSelection.FRONT -> "Le flux caméra avant est désactivé."
+            }
+            return
+        }
+
+        val port = when (selectedCamera) {
+            CameraSelection.REAR -> configuration.rearPort
+            CameraSelection.FRONT -> configuration.frontPort
+        }
+
+        val stream = createStream(selectedCamera, port, configuration)
+        when (selectedCamera) {
+            CameraSelection.REAR -> rearStream = stream
+            CameraSelection.FRONT -> frontStream = stream
+        }
     }
 
     private fun createStreams(configuration: RtspConfiguration) {
@@ -136,13 +171,36 @@ class RtspStreamManager(
         }.getOrNull()
     }
 
+    private fun streamFor(selection: CameraSelection): ConcurrentRtspServerStream? =
+        when (selection) {
+            CameraSelection.REAR -> rearStream
+            CameraSelection.FRONT -> frontStream
+        }
+
+    private fun stopSelectedStream() {
+        stopStream(selectedCamera)
+    }
+
+    private fun stopStream(selection: CameraSelection) {
+        detachPreview(selection)
+        when (selection) {
+            CameraSelection.REAR -> {
+                runCatching { rearStream?.stopStream() }
+                runCatching { rearStream?.release() }
+                rearStream = null
+            }
+            CameraSelection.FRONT -> {
+                runCatching { frontStream?.stopStream() }
+                runCatching { frontStream?.release() }
+                frontStream = null
+            }
+        }
+    }
+
     private fun attachPreview(selection: CameraSelection) {
         if (!previewSurfaceReady) return
 
-        val stream = when (selection) {
-            CameraSelection.REAR -> rearStream
-            CameraSelection.FRONT -> frontStream
-        } ?: run {
+        val stream = streamFor(selection) ?: run {
             lastError = selection.name.lowercase() + ": flux RTSP non disponible"
             return
         }
@@ -156,12 +214,9 @@ class RtspStreamManager(
     }
 
     private fun detachPreview(selection: CameraSelection) {
-        val stream = when (selection) {
-            CameraSelection.REAR -> rearStream
-            CameraSelection.FRONT -> frontStream
-        } ?: return
-
-        runCatching { stream.stopPreview() }
+        streamFor(selection)?.let { stream ->
+            runCatching { stream.stopPreview() }
+        }
     }
 
     private fun checker(selection: CameraSelection) = object : ConnectChecker {
