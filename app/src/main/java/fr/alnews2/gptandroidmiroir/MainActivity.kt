@@ -3,7 +3,6 @@ package fr.alnews2.gptandroidmiroir
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -96,9 +95,8 @@ private fun CameraApp(onQuit: () -> Unit) {
         return
     }
 
-    val rearView = remember { OpenGlView(context) }
-    val frontView = remember { OpenGlView(context) }
-    val streamManager = remember { RtspStreamManager(context, rearView, frontView) }
+    val previewView = remember { OpenGlView(context) }
+    val streamManager = remember { RtspStreamManager(context, previewView) }
 
     LaunchedEffect(configuration) {
         val errors = configuration.validate()
@@ -116,9 +114,7 @@ private fun CameraApp(onQuit: () -> Unit) {
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         CameraPreview(
-            selection = cameraSelection,
-            rearView = rearView,
-            frontView = frontView,
+            previewView = previewView,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -134,7 +130,10 @@ private fun CameraApp(onQuit: () -> Unit) {
         }
 
         CameraMenu(
-            onCameraSelected = { cameraSelection = it },
+            onCameraSelected = {
+                cameraSelection = it
+                streamManager.selectCamera(it)
+            },
             onConfigureRtsp = { showRtspConfiguration = true },
             onQuit = onQuit,
             modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
@@ -215,33 +214,13 @@ private fun CameraMenu(
 
 @Composable
 private fun CameraPreview(
-    selection: CameraSelection,
-    rearView: OpenGlView,
-    frontView: OpenGlView,
+    previewView: OpenGlView,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier) {
-        AndroidView(
-            factory = { rearView },
-            update = { view ->
-                view.visibility = View.VISIBLE
-                if (selection == CameraSelection.REAR) {
-                    view.bringToFront()
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-        AndroidView(
-            factory = { frontView },
-            update = { view ->
-                view.visibility = View.VISIBLE
-                if (selection == CameraSelection.FRONT) {
-                    view.bringToFront()
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-    }
+    AndroidView(
+        factory = { previewView },
+        modifier = modifier
+    )
 }
 
 @Composable
