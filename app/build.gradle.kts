@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "fr.alnews2.gptandroidmiroir"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "fr.alnews2.gptandroidmiroir"
