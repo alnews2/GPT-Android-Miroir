@@ -41,6 +41,8 @@ class ConcurrentCameraController(context: Context) {
             targets[selection] = Target(surface, width, height, fps)
             if (targets.containsKey(CameraSelection.REAR) && targets.containsKey(CameraSelection.FRONT)) {
                 openConcurrentCameras()
+            } else {
+                openSingleCamera(selection)
             }
         }
     }
@@ -79,10 +81,54 @@ class ConcurrentCameraController(context: Context) {
         }
     }
 
+    private fun openSingleCamera(selection: CameraSelection) {
+        val cameraId = ids[selection]
+        val target = targets[selection]
+        if (cameraId == null || target == null) {
+            lastError = "${selection.name.lowercase()}: caméra introuvable."
+            return
+        }
+        if (devices[selection] != null) return
+
+        closeAllLocked()
+
+        runCatching {
+            cameraManager.openCamera(cameraId, executor, object : CameraDevice.StateCallback() {
+                override fun onOpened(camera: CameraDevice) {
+                    synchronized(this@ConcurrentCameraController) {
+                        devices[selection] = camera
+                        targets[selection]?.let { createSession(selection, camera, it) }
+                    }
+                }
+
+                override fun onDisconnected(camera: CameraDevice) {
+                    synchronized(this@ConcurrentCameraController) {
+                        devices.remove(selection)
+                        running.remove(selection)
+                    }
+                    camera.close()
+                    lastError = "${selection.name.lowercase()}: caméra déconnectée"
+                }
+
+                override fun onError(camera: CameraDevice, error: Int) {
+                    synchronized(this@ConcurrentCameraController) {
+                        devices.remove(selection)
+                        running.remove(selection)
+                    }
+                    camera.close()
+                    lastError = "${selection.name.lowercase()}: erreur Camera2 $error"
+                }
+            })
+        }.onFailure {
+            lastError = "${selection.name.lowercase()}: " +
+                (it.message ?: "impossible d'ouvrir la caméra")
+        }
+    }
+
     private fun openConcurrentCameras() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         if (!isConcurrentSupported()) {
-            lastError = "Ce téléphone ne prend pas en charge la capture simultanée avant/arrière."
+            lastError = "Capture simultanée avant/arrière indisponible."
             return
         }
         if (devices.size == 2) return
