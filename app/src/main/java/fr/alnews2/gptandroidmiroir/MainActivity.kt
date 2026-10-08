@@ -3,6 +3,7 @@ package fr.alnews2.gptandroidmiroir
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -39,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -223,11 +223,17 @@ private fun CameraPreview(
     Box(modifier = modifier) {
         AndroidView(
             factory = { rearView },
-            modifier = Modifier.fillMaxSize().alpha(if (selection == CameraSelection.REAR) 1f else 0f)
+            update = { view ->
+                view.visibility = if (selection == CameraSelection.REAR) View.VISIBLE else View.GONE
+            },
+            modifier = Modifier.fillMaxSize()
         )
         AndroidView(
             factory = { frontView },
-            modifier = Modifier.fillMaxSize().alpha(if (selection == CameraSelection.FRONT) 1f else 0f)
+            update = { view ->
+                view.visibility = if (selection == CameraSelection.FRONT) View.VISIBLE else View.GONE
+            },
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
