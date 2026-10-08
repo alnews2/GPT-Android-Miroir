@@ -13,4 +13,7 @@ All notable changes to this project will be documented in this file.
 - H.264 video encoding through the Android RTSP Server library.
 
 ### Fixed
+- Correction de l'affichage de la caméra avant lors du changement de flux.
+- Correction de l'orientation de l'aperçu vidéo en portrait et en paysage.
+- Suppression du verrouillage forcé en portrait de l'activité.
 - Correction de la compilation de MainActivity avec l'import de l'extension Compose setContent.
