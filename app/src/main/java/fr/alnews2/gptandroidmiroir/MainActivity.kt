@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
@@ -41,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -224,13 +223,11 @@ private fun CameraPreview(
     Box(modifier = modifier) {
         AndroidView(
             factory = { rearView },
-            modifier = Modifier.fillMaxSize().then(
-                if (selection == CameraSelection.REAR) Modifier else Modifier
-            )
+            modifier = Modifier.fillMaxSize().alpha(if (selection == CameraSelection.REAR) 1f else 0f)
         )
         AndroidView(
             factory = { frontView },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().alpha(if (selection == CameraSelection.FRONT) 1f else 0f)
         )
     }
 }
@@ -254,9 +251,7 @@ private fun RtspConfigurationDialog(
         onDismissRequest = onDismiss,
         title = { Text("Configurer RTSP") },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
