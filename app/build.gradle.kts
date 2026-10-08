@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "fr.alnews2.gptandroidmiroir"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "fr.alnews2.gptandroidmiroir"
@@ -34,6 +34,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
-    implementation("com.github.pedroSG94:RTSP-Server:1.4.2")
+    implementation("com.github.pedroSG94:RTSP-Server:1.3.6")
     testImplementation("junit:junit:4.13.2")
 }
