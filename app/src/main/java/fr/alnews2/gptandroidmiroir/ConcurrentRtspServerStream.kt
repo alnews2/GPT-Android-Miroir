@@ -25,51 +25,27 @@ class ConcurrentRtspServerStream(
 ) {
     private val rtspServer = RtspServer(connectChecker, port)
 
-    init {
-        rtspServer.setOnlyVideo(true)
-    }
+    init { rtspServer.setOnlyVideo(true) }
 
-    fun startStream() {
-        super.startStream("")
-    }
-
-    fun startPreview(view: OpenGlView) {
-        super.startPreview(view, true)
-    }
-
+    fun startStream() { super.startStream("") }
+    fun startPreview(view: OpenGlView) { super.startPreview(view, true) }
     fun stopPreview() {
-        if (isOnPreview) super.stopPreview()
+        if (isOnPreview) super.stopPreview(false)
     }
 
     override fun onAudioInfoImp(sampleRate: Int, isStereo: Boolean) {
         rtspServer.setAudioInfo(sampleRate, isStereo)
     }
-
-    override fun startStreamImp(url: String) {
-        rtspServer.startServer()
-    }
-
-    override fun stopStreamImp() {
-        rtspServer.stopServer()
-    }
-
+    override fun startStreamImp(url: String) { rtspServer.startServer() }
+    override fun stopStreamImp() { rtspServer.stopServer() }
     override fun onVideoInfoImp(sps: ByteBuffer, pps: ByteBuffer?, vps: ByteBuffer?) {
         rtspServer.setVideoInfo(sps.duplicate(), pps?.duplicate(), vps?.duplicate())
     }
-
     override fun getVideoDataImp(videoBuffer: ByteBuffer, info: MediaCodec.BufferInfo) {
         rtspServer.sendVideo(videoBuffer, info)
     }
-
     override fun getAudioDataImp(audioBuffer: ByteBuffer, info: MediaCodec.BufferInfo) = Unit
-
     override fun getStreamClient(): RtspServerStreamClient = RtspServerStreamClient(rtspServer)
-
-    override fun setVideoCodecImp(codec: VideoCodec) {
-        rtspServer.setVideoCodec(codec)
-    }
-
-    override fun setAudioCodecImp(codec: AudioCodec) {
-        rtspServer.setAudioCodec(codec)
-    }
+    override fun setVideoCodecImp(codec: VideoCodec) { rtspServer.setVideoCodec(codec) }
+    override fun setAudioCodecImp(codec: AudioCodec) { rtspServer.setAudioCodec(codec) }
 }
