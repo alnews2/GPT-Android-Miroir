@@ -3,16 +3,16 @@ package fr.alnews2.gptandroidmiroir
 import android.content.Context
 import android.view.SurfaceHolder
 import com.pedro.common.ConnectChecker
-import com.pedro.encoder.input.video.CameraHelper
+import com.pedro.common.VideoCodec
 import com.pedro.library.view.OpenGlView
-import com.pedro.rtspserver.RtspServerCamera2
 
 class RtspStreamManager(
     private val context: Context,
     private val previewView: OpenGlView
 ) {
-    private var rearStream: RtspServerCamera2? = null
-    private var frontStream: RtspServerCamera2? = null
+    private val cameraController = ConcurrentCameraController(context)
+    private var rearStream: ConcurrentRtspServerStream? = null
+    private var frontStream: ConcurrentRtspServerStream? = null
     private var configuration: RtspConfiguration? = null
     private var selectedCamera = CameraSelection.REAR
     private var previewSurfaceReady = false
@@ -45,7 +45,17 @@ class RtspStreamManager(
         stop()
         lastError = null
         this.configuration = configuration
+
+        if (configuration.rearEnabled && configuration.frontEnabled &&
+            !cameraController.isConcurrentSupported()
+        ) {
+            lastError =
+                "Ce téléphone ne prend pas en charge la capture simultanée des caméras avant et arrière."
+            return
+        }
+
         createStreams(configuration)
+        lastError = cameraController.lastError ?: lastError
         if (previewSurfaceReady) attachPreview(selectedCamera)
     }
 
@@ -54,16 +64,20 @@ class RtspStreamManager(
         detachPreview(selectedCamera)
         selectedCamera = selection
         lastError = null
-        if (previewSurfaceReady) attachPreview(selection)
+        attachPreview(selection)
+        lastError = cameraController.lastError ?: lastError
     }
 
     fun stop() {
         detachPreview(selectedCamera)
         runCatching { rearStream?.stopStream() }
         runCatching { frontStream?.stopStream() }
+        runCatching { rearStream?.release() }
+        runCatching { frontStream?.release() }
         rearStream = null
         frontStream = null
         configuration = null
+        cameraController.close()
     }
 
     fun isRunning(selection: CameraSelection): Boolean = when (selection) {
@@ -78,18 +92,10 @@ class RtspStreamManager(
 
     private fun createStreams(configuration: RtspConfiguration) {
         if (configuration.rearEnabled) {
-            rearStream = createStream(
-                CameraSelection.REAR,
-                configuration.rearPort,
-                configuration
-            )
+            rearStream = createStream(CameraSelection.REAR, configuration.rearPort, configuration)
         }
         if (configuration.frontEnabled) {
-            frontStream = createStream(
-                CameraSelection.FRONT,
-                configuration.frontPort,
-                configuration
-            )
+            frontStream = createStream(CameraSelection.FRONT, configuration.frontPort, configuration)
         }
     }
 
@@ -97,36 +103,31 @@ class RtspStreamManager(
         selection: CameraSelection,
         port: Int,
         configuration: RtspConfiguration
-    ): RtspServerCamera2? {
+    ): ConcurrentRtspServerStream? {
         return runCatching {
-            // Background mode: no camera preview surface is required to start the RTSP server.
-            val stream = RtspServerCamera2(context, checker(selection), port)
-            val rotation = CameraHelper.getCameraOrientation(context)
+            val stream = ConcurrentRtspServerStream(
+                context = context,
+                connectChecker = checker(selection),
+                cameraSelection = selection,
+                controller = cameraController,
+                port = port
+            )
             check(
                 stream.prepareVideo(
                     configuration.width,
                     configuration.height,
-                    configuration.fps,
                     configuration.bitrate,
+                    configuration.fps,
                     2,
-                    rotation
+                    0
                 )
             ) {
                 "encodeur H.264 indisponible"
             }
-            // Select the requested camera explicitly before starting the background stream.
-            stream.startPreview(
-                if (selection == CameraSelection.FRONT) {
-                    CameraHelper.Facing.FRONT
-                } else {
-                    CameraHelper.Facing.BACK
-                },
-                configuration.width,
-                configuration.height,
-                configuration.fps,
-                rotation
-            )
-            stream.getStreamClient().setOnlyVideo(true)
+            check(stream.prepareAudio(44_100, true, 64_000)) {
+                "préparation audio indisponible"
+            }
+            stream.setVideoCodec(VideoCodec.H264)
             stream.startStream()
             stream
         }.onFailure { error ->
@@ -137,6 +138,7 @@ class RtspStreamManager(
 
     private fun attachPreview(selection: CameraSelection) {
         if (!previewSurfaceReady) return
+
         val stream = when (selection) {
             CameraSelection.REAR -> rearStream
             CameraSelection.FRONT -> frontStream
@@ -146,7 +148,7 @@ class RtspStreamManager(
         }
 
         runCatching {
-            stream.replaceView(previewView)
+            stream.startPreview(previewView)
         }.onFailure { error ->
             lastError = selection.name.lowercase() + ": " +
                 (error.message ?: "échec de l'affichage de la prévisualisation")
@@ -159,9 +161,7 @@ class RtspStreamManager(
             CameraSelection.FRONT -> frontStream
         } ?: return
 
-        runCatching {
-            stream.replaceView(context)
-        }
+        runCatching { stream.stopPreview() }
     }
 
     private fun checker(selection: CameraSelection) = object : ConnectChecker {
