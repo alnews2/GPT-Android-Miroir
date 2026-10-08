@@ -9,32 +9,55 @@ import com.pedro.rtspserver.RtspServerCamera2
 
 class RtspStreamManager(
     private val context: Context,
-    private val rearView: OpenGlView,
-    private val frontView: OpenGlView
+    private val previewView: OpenGlView
 ) {
     private var rearStream: RtspServerCamera2? = null
     private var frontStream: RtspServerCamera2? = null
     private var configuration: RtspConfiguration? = null
-    private var rearSurfaceReady = false
-    private var frontSurfaceReady = false
+    private var selectedCamera = CameraSelection.REAR
+    private var previewSurfaceReady = false
 
     var lastError: String? = null
         private set
 
     init {
-        rearView.holder.addCallback(surfaceCallback(CameraSelection.REAR))
-        frontView.holder.addCallback(surfaceCallback(CameraSelection.FRONT))
+        previewView.holder.addCallback(object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                previewSurfaceReady = true
+                attachPreview(selectedCamera)
+            }
+
+            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                if (holder.surface.isValid) {
+                    previewSurfaceReady = true
+                    attachPreview(selectedCamera)
+                }
+            }
+
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                previewSurfaceReady = false
+                detachPreview(selectedCamera)
+            }
+        })
     }
 
     fun start(configuration: RtspConfiguration) {
         stop()
         lastError = null
         this.configuration = configuration
-        tryStart(CameraSelection.REAR)
-        tryStart(CameraSelection.FRONT)
+        createStreams(configuration)
+        if (previewSurfaceReady) attachPreview(selectedCamera)
+    }
+
+    fun selectCamera(selection: CameraSelection) {
+        if (selectedCamera == selection) return
+        detachPreview(selectedCamera)
+        selectedCamera = selection
+        if (previewSurfaceReady) attachPreview(selection)
     }
 
     fun stop() {
+        detachPreview(selectedCamera)
         runCatching { rearStream?.stopStream() }
         runCatching { frontStream?.stopStream() }
         rearStream = null
@@ -52,84 +75,31 @@ class RtspStreamManager(
         CameraSelection.FRONT -> frontStream?.getStreamClient()?.getEndPointConnection()
     }
 
-    private fun surfaceCallback(selection: CameraSelection) = object : SurfaceHolder.Callback {
-        override fun surfaceCreated(holder: SurfaceHolder) {
-            setSurfaceReady(selection, true)
-            tryStart(selection)
+    private fun createStreams(configuration: RtspConfiguration) {
+        if (configuration.rearEnabled) {
+            rearStream = createStream(
+                CameraSelection.REAR,
+                configuration.rearPort,
+                configuration
+            )
         }
-
-        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            if (holder.surface.isValid) {
-                setSurfaceReady(selection, true)
-                tryStart(selection)
-            }
-        }
-
-        override fun surfaceDestroyed(holder: SurfaceHolder) {
-            setSurfaceReady(selection, false)
-            stop(selection)
-        }
-    }
-
-    private fun setSurfaceReady(selection: CameraSelection, ready: Boolean) {
-        when (selection) {
-            CameraSelection.REAR -> rearSurfaceReady = ready
-            CameraSelection.FRONT -> frontSurfaceReady = ready
-        }
-    }
-
-    private fun tryStart(selection: CameraSelection) {
-        val currentConfiguration = configuration ?: return
-        val surfaceReady = when (selection) {
-            CameraSelection.REAR -> rearSurfaceReady
-            CameraSelection.FRONT -> frontSurfaceReady
-        }
-        if (!surfaceReady || !isEnabled(selection, currentConfiguration) || isRunning(selection)) return
-
-        val view = when (selection) {
-            CameraSelection.REAR -> rearView
-            CameraSelection.FRONT -> frontView
-        }
-        val port = when (selection) {
-            CameraSelection.REAR -> currentConfiguration.rearPort
-            CameraSelection.FRONT -> currentConfiguration.frontPort
-        }
-
-        createStream(selection, port, view, currentConfiguration)?.let { stream ->
-            when (selection) {
-                CameraSelection.REAR -> rearStream = stream
-                CameraSelection.FRONT -> frontStream = stream
-            }
-        }
-    }
-
-    private fun isEnabled(selection: CameraSelection, configuration: RtspConfiguration): Boolean =
-        when (selection) {
-            CameraSelection.REAR -> configuration.rearEnabled
-            CameraSelection.FRONT -> configuration.frontEnabled
-        }
-
-    private fun stop(selection: CameraSelection) {
-        when (selection) {
-            CameraSelection.REAR -> {
-                runCatching { rearStream?.stopStream() }
-                rearStream = null
-            }
-            CameraSelection.FRONT -> {
-                runCatching { frontStream?.stopStream() }
-                frontStream = null
-            }
+        if (configuration.frontEnabled) {
+            frontStream = createStream(
+                CameraSelection.FRONT,
+                configuration.frontPort,
+                configuration
+            )
         }
     }
 
     private fun createStream(
         selection: CameraSelection,
         port: Int,
-        view: OpenGlView,
         configuration: RtspConfiguration
     ): RtspServerCamera2? {
         return runCatching {
-            val stream = RtspServerCamera2(view, checker(selection), port)
+            // Background mode: no camera preview surface is required to start the RTSP server.
+            val stream = RtspServerCamera2(context, checker(selection), port)
             val rotation = CameraHelper.getCameraOrientation(context)
             check(
                 stream.prepareVideo(
@@ -153,6 +123,32 @@ class RtspStreamManager(
             lastError = selection.name.lowercase() + ": " +
                 (error.message ?: "échec du démarrage RTSP")
         }.getOrNull()
+    }
+
+    private fun attachPreview(selection: CameraSelection) {
+        if (!previewSurfaceReady) return
+        val stream = when (selection) {
+            CameraSelection.REAR -> rearStream
+            CameraSelection.FRONT -> frontStream
+        } ?: return
+
+        runCatching {
+            stream.replaceView(previewView)
+        }.onFailure { error ->
+            lastError = selection.name.lowercase() + ": " +
+                (error.message ?: "échec de l'affichage de la prévisualisation")
+        }
+    }
+
+    private fun detachPreview(selection: CameraSelection) {
+        val stream = when (selection) {
+            CameraSelection.REAR -> rearStream
+            CameraSelection.FRONT -> frontStream
+        } ?: return
+
+        runCatching {
+            stream.replaceView(context)
+        }
     }
 
     private fun checker(selection: CameraSelection) = object : ConnectChecker {
