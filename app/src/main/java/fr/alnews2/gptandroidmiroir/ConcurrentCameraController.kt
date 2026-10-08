@@ -124,7 +124,6 @@ class ConcurrentCameraController(context: Context) {
     }
 
     private fun openCamera(selection: CameraSelection, cameraId: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
         cameraManager.openCamera(cameraId, executor, object : CameraDevice.StateCallback() {
             override fun onOpened(camera: CameraDevice) {
                 synchronized(this@ConcurrentCameraController) {
@@ -163,7 +162,6 @@ class ConcurrentCameraController(context: Context) {
     }
 
     private fun createSession(selection: CameraSelection, device: CameraDevice, target: Target) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
         val configuration = SessionConfiguration(
             SessionConfiguration.SESSION_REGULAR,
             listOf(OutputConfiguration(target.surface)),
@@ -175,7 +173,7 @@ class ConcurrentCameraController(context: Context) {
                         runCatching {
                             val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
                                 .apply { addTarget(target.surface) }.build()
-                            session.setRepeatingRequest(request, null, executor)
+                            session.setRepeatingRequest(request, null, null)
                             running += selection
                         }.onFailure {
                             lastError = "${selection.name.lowercase()}: " +
