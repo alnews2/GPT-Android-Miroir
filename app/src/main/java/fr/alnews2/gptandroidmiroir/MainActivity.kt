@@ -224,14 +224,20 @@ private fun CameraPreview(
         AndroidView(
             factory = { rearView },
             update = { view ->
-                view.visibility = if (selection == CameraSelection.REAR) View.VISIBLE else View.GONE
+                view.visibility = View.VISIBLE
+                if (selection == CameraSelection.REAR) {
+                    view.bringToFront()
+                }
             },
             modifier = Modifier.fillMaxSize()
         )
         AndroidView(
             factory = { frontView },
             update = { view ->
-                view.visibility = if (selection == CameraSelection.FRONT) View.VISIBLE else View.GONE
+                view.visibility = View.VISIBLE
+                if (selection == CameraSelection.FRONT) {
+                    view.bringToFront()
+                }
             },
             modifier = Modifier.fillMaxSize()
         )
