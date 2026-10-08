@@ -133,6 +133,7 @@ private fun CameraApp(onQuit: () -> Unit) {
             onCameraSelected = {
                 cameraSelection = it
                 streamManager.selectCamera(it)
+                streamError = streamManager.lastError
             },
             onConfigureRtsp = { showRtspConfiguration = true },
             onQuit = onQuit,
