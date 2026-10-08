@@ -11,13 +11,14 @@ Application Android standalone développée en Kotlin avec Jetpack Compose et un
 - Configuration persistante des ports RTSP, de la résolution, du nombre d'images par seconde et du débit.
 - Commande `Configurer RTSP` dans le menu.
 - Demande de permission caméra lors du premier lancement.
+- Capture simultanée avant/arrière basée sur l'API Camera2 concurrente d'Android 11+.
 
 ### Adresses RTSP par défaut
 
 - Caméra arrière : `rtsp://ADRESSE_IP_DU_TELEPHONE:8554/`
 - Caméra avant : `rtsp://ADRESSE_IP_DU_TELEPHONE:8555/`
 
-Les deux flux utilisent H.264. La possibilité d'utiliser simultanément les deux caméras dépend des capacités matérielles du téléphone.
+Les deux flux utilisent H.264. La capture simultanée des caméras avant et arrière n'est disponible que sur les appareils dont le matériel Android déclare cette combinaison comme concurrente. Sur un appareil incompatible, l'application signale explicitement l'indisponibilité au lieu de laisser un seul flux fonctionner silencieusement.
 
 ## Tests
 
