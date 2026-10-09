@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - conservation de deux serveurs RTSP indépendants, sur les ports 8554 et 8555 par défaut.
 
 ### Added
+- automatisation des publications Android après mise à jour de `main`, avec tag Git, notes de version et APK joint à la Release GitHub.
 - Initial Android application foundation using Kotlin, Jetpack Compose and Material 3.
 - Dual RTSP server architecture for simultaneous front and rear camera streams.
 - Persistent RTSP configuration with independent ports, resolution, frame rate and bitrate.
