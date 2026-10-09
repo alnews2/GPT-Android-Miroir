@@ -44,23 +44,31 @@ class RtspStreamManager(
         })
     }
 
-    fun start(configuration: RtspConfiguration) {
+    fun start(
+        configuration: RtspConfiguration,
+        preferredCamera: CameraSelection = CameraSelection.REAR
+    ) {
         stop()
         lastError = null
         this.configuration = configuration
-        selectedCamera = CameraSelection.REAR
+
+        val preferredCameraEnabled = when (preferredCamera) {
+            CameraSelection.REAR -> configuration.rearEnabled
+            CameraSelection.FRONT -> configuration.frontEnabled
+        }
+        selectedCamera = if (preferredCameraEnabled) {
+            preferredCamera
+        } else if (configuration.rearEnabled) {
+            CameraSelection.REAR
+        } else {
+            CameraSelection.FRONT
+        }
 
         val bothEnabled = configuration.rearEnabled && configuration.frontEnabled
         singleCameraMode = !bothEnabled || !cameraController.isConcurrentSupported()
 
         if (singleCameraMode) {
-            val selection = if (configuration.rearEnabled) {
-                CameraSelection.REAR
-            } else {
-                CameraSelection.FRONT
-            }
-            selectedCamera = selection
-            singleStream = createSingleStream(selection, configuration)
+            singleStream = createSingleStream(selectedCamera, configuration)
         } else {
             createStreams(configuration)
         }
