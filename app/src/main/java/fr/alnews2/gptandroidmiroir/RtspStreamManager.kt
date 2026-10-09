@@ -192,6 +192,11 @@ class RtspStreamManager(
                 connectChecker = checker(selection),
                 port = port
             )
+            // Camera2Source defaults to the rear camera. Select the front camera
+            // before preparing and starting the stream when requested.
+            if (selection == CameraSelection.FRONT) {
+                stream.switchCamera()
+            }
             check(
                 stream.prepareVideo(
                     configuration.width,
