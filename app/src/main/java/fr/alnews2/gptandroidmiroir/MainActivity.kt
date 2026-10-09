@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +61,7 @@ private fun CameraApp(onQuit: () -> Unit) {
     val context = LocalContext.current
     val store = remember { RtspConfigurationStore(context) }
     var configuration by remember { mutableStateOf(store.load()) }
-    var cameraSelection by remember { mutableStateOf(CameraSelection.REAR) }
+    var cameraSelection by rememberSaveable { mutableStateOf(CameraSelection.REAR) }
     var permissionGranted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -106,7 +107,7 @@ private fun CameraApp(onQuit: () -> Unit) {
     LaunchedEffect(configuration) {
         val errors = configuration.validate()
         if (errors.isEmpty()) {
-            streamManager.start(configuration)
+            streamManager.start(configuration, cameraSelection)
             streamError = streamManager.lastError
         } else {
             streamError = errors.joinToString("\n")
