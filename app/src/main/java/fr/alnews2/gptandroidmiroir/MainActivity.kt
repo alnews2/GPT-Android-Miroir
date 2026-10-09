@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.pedro.encoder.utils.gl.AspectRatioMode
 import com.pedro.library.view.OpenGlView
 
 class MainActivity : ComponentActivity() {
@@ -95,7 +96,11 @@ private fun CameraApp(onQuit: () -> Unit) {
         return
     }
 
-    val previewView = remember { OpenGlView(context) }
+    val previewView = remember {
+        OpenGlView(context).apply {
+            setAspectRatioMode(AspectRatioMode.Adjust)
+        }
+    }
     val streamManager = remember { RtspStreamManager(context, previewView) }
 
     LaunchedEffect(configuration) {
