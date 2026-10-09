@@ -1,6 +1,7 @@
 package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
+import android.content.res.Configuration
 import android.view.SurfaceHolder
 import com.pedro.common.ConnectChecker
 import com.pedro.common.VideoCodec
@@ -131,6 +132,9 @@ class RtspStreamManager(
         }
     }
 
+    private fun videoRotation(): Int =
+        if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) 90 else 0
+
     private fun createStreams(configuration: RtspConfiguration) {
         if (configuration.rearEnabled) {
             rearStream = createStream(CameraSelection.REAR, configuration.rearPort, configuration)
@@ -160,7 +164,7 @@ class RtspStreamManager(
                     configuration.bitrate,
                     configuration.fps,
                     2,
-                    0
+                    videoRotation()
                 )
             ) {
                 "encodeur H.264 indisponible"
@@ -204,7 +208,7 @@ class RtspStreamManager(
                     configuration.bitrate,
                     configuration.fps,
                     2,
-                    0
+                    videoRotation()
                 )
             ) {
                 "encodeur H.264 indisponible"
