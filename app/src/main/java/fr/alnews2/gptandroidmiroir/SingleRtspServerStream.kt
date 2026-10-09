@@ -36,10 +36,6 @@ class SingleRtspServerStream(
         super.startPreview(view, true)
     }
 
-    fun stopPreview() {
-        if (isOnPreview) super.stopPreview(false)
-    }
-
     fun switchCamera() {
         (videoSource as Camera2Source).switchCamera()
     }
