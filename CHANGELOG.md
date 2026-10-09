@@ -6,7 +6,6 @@ All notable changes to this project will be documented in this file.
 - remplacement de l'architecture double `RtspServerCamera2` par deux sources Camera2 coordonnées via l'API Android de capture concurrente.
 - vérification explicite de la compatibilité matérielle avant d'activer les flux avant et arrière simultanément.
 - ajout d'un mode de repli à une caméra active pour les téléphones ne supportant pas la capture simultanée avant/arrière.
-- ajout d'un mode de repli à une caméra active pour les téléphones ne supportant pas la capture simultanée avant/arrière.
 - conservation de deux serveurs RTSP indépendants, sur les ports 8554 et 8555 par défaut.
 
 ### Added
@@ -19,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Camera2 concurrent-device controller for Android 11+ compatible hardware.
 
 ### Fixed
+- Suppression d'une redéfinition interdite de `StreamBase.stopPreview()` qui provoquait un plantage au démarrage en mode caméra unique.
 - Correction de l'affichage de la caméra avant lors du changement de flux.
 - Correction de l'orientation de l'aperçu vidéo en portrait et en paysage.
 - Suppression du verrouillage forcé en portrait de l'activité.
