@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Camera2 concurrent-device controller for Android 11+ compatible hardware.
 
 ### Fixed
+- adaptation de la rotation vidéo à l'orientation portrait/paysage et conservation des proportions de l'aperçu.
 - sélection explicite de la caméra avant lors de la création du flux de repli à caméra unique.
 - Suppression d'une redéfinition interdite de `StreamBase.stopPreview()` qui provoquait un plantage au démarrage en mode caméra unique.
 - Correction de l'affichage de la caméra avant lors du changement de flux.
