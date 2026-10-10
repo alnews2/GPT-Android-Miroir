@@ -1,0 +1,91 @@
+name: Android Release
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Calculate release version
+        id: version
+        shell: bash
+        run: |
+          git fetch --tags --force
+          latest_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
+          if [[ -z "$latest_tag" ]]; then
+            version="1.0.0"
+          elif [[ "$latest_tag" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            patch="${BASH_REMATCH[3]}"
+            if (( major == 0 )); then
+              version="1.0.0"
+            else
+              version="${major}.${minor}.$((patch + 1))"
+            fi
+          else
+            echo "Le dernier tag '$latest_tag' n'est pas au format semver vMAJOR.MINOR.PATCH." >&2
+            exit 1
+          fi
+          IFS='.' read -r major minor patch <<< "$version"
+          version_code=$((major * 1000000 + minor * 1000 + patch))
+          tag="v${version}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "Le tag ${tag} existe déjà ; arrêt pour éviter d'écraser une release." >&2
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${version_code}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Publication prévue : ${tag} (versionCode ${version_code})"
+
+      - name: Run unit tests
+        run: gradle -PreleaseVersionName="${{ steps.version.outputs.version }}" -PreleaseVersionCode="${{ steps.version.outputs.version_code }}" test
+
+      - name: Build APK
+        run: gradle -PreleaseVersionName="${{ steps.version.outputs.version }}" -PreleaseVersionCode="${{ steps.version.outputs.version_code }}" assembleDebug
+
+      - name: Prepare release APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk "GPT-Android-Miroir-${{ steps.version.outputs.tag }}.apk"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: GPT-Android-Miroir ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: GPT-Android-Miroir-${{ steps.version.outputs.tag }}.apk

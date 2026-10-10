@@ -24,8 +24,12 @@ Les deux flux utilisent H.264. La capture simultanée des caméras avant et arri
 
 Les tests unitaires couvrent notamment la validation des ports, l'activation des flux et les paramètres vidéo RTSP.
 
-## Développement
+## Intégration continue et publications
 
-Le projet suit un workflow Git par branche dédiée, avec validation CI et génération d'un APK debug avant fusion vers `main`.
+- Chaque pull request vers `main` déclenche les tests unitaires et la compilation de vérification.
+- Chaque mise à jour de `main` (normalement après la fusion d'une pull request) déclenche les tests puis la compilation de l'APK.
+- Si les vérifications réussissent, GitHub Actions crée automatiquement un tag Git et une Release GitHub avec des notes générées à partir des pull requests et un APK téléchargeable.
+- La première version stable est `v1.0.0`. Les publications suivantes incrémentent automatiquement le numéro de correctif (`v1.0.1`, `v1.0.2`, etc.).
+- Le nom de version Android et le `versionCode` sont injectés par le workflow de publication ; les compilations locales conservent les valeurs par défaut du projet.
 
-Branche de développement : `feature/camera-preview`
+Le développement se fait dans une branche dédiée. La fusion vers `main` reste manuelle après validation.

@@ -11,8 +11,9 @@ android {
         applicationId = "fr.alnews2.gptandroidmiroir"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI injects the release version when building a tagged release.
+        versionCode = providers.gradleProperty("releaseVersionCode").orElse("1").get().toInt()
+        versionName = providers.gradleProperty("releaseVersionName").orElse("0.1.0").get()
     }
 
     buildFeatures {
