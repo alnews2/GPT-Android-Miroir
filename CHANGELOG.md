@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 - prévention des redémarrages inutiles de la prévisualisation lorsque `surfaceChanged` suit `surfaceCreated`, avec suivi du flux actuellement attaché.
-- renforcement de la requête d'exposition automatique en mode à caméra unique : mode de contrôle AUTO, AE ON, verrouillage AE désactivé et compensation d'exposition remise à zéro, avec journalisation du résultat d'application. RootEncoder 2.6.6 n'expose pas les `TotalCaptureResult` de cette source, donc le temps d'exposition et l'ISO réels ne peuvent pas encore être journalisés dans ce mode ; en mode simultané, ils restent suivis via les résultats Camera2. Validation visuelle nécessaire sur le Poco M4.
+- renforcement de la requête d'exposition automatique en mode à caméra unique : mode de contrôle AUTO, AE ON, verrouillage AE désactivé et compensation d'exposition remise à zéro. Mise à niveau de RootEncoder vers 2.8.1 pour journaliser les résultats Camera2 réels (état AE, temps d'exposition et ISO), uniquement lorsque l'état change ou que l'exposition/ISO varie d'au moins 20 %. Validation visuelle nécessaire sur le Poco M4.
 - ajout du zoom par pincement à deux doigts, appliqué à la capture pour l'aperçu et le flux RTSP, en portrait comme en paysage.
 - ajout du titre « Miroir Android » en haut de la fenêtre principale et d'une nouvelle icône adaptative évoquant le téléphone, la caméra et le miroir.
 - adoption de SemVer et des Conventional Commits pour déterminer automatiquement le niveau de version publié.
