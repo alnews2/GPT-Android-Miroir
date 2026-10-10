@@ -77,6 +77,15 @@ class RtspStreamManager(
         if (previewSurfaceReady) attachPreview(selectedCamera)
     }
 
+    fun adjustZoom(factor: Float) {
+        if (!factor.isFinite() || factor <= 0f) return
+        if (singleCameraMode) {
+            singleStream?.adjustZoom(factor)
+        } else {
+            cameraController.adjustZoom(selectedCamera, factor)
+        }
+    }
+
     fun selectCamera(selection: CameraSelection) {
         if (selectedCamera == selection) return
         val config = configuration ?: return

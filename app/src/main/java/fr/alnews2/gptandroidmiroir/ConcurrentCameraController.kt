@@ -5,6 +5,8 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
+import android.graphics.Rect
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.os.Build
@@ -22,6 +24,7 @@ class ConcurrentCameraController(context: Context) {
     private val devices = mutableMapOf<CameraSelection, CameraDevice>()
     private val sessions = mutableMapOf<CameraSelection, CameraCaptureSession>()
     private val running = mutableSetOf<CameraSelection>()
+    private val zoomRatios = mutableMapOf(CameraSelection.REAR to 1f, CameraSelection.FRONT to 1f)
 
     @Volatile var lastError: String? = null
         private set
@@ -56,6 +59,35 @@ class ConcurrentCameraController(context: Context) {
     }
 
     fun isRunning(selection: CameraSelection): Boolean = synchronized(this) { selection in running }
+
+    fun adjustZoom(selection: CameraSelection, factor: Float) {
+        synchronized(this) {
+            val cameraId = ids[selection] ?: return
+            val chars = runCatching { cameraManager.getCameraCharacteristics(cameraId) }.getOrNull() ?: return
+            val maxZoom = (chars.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1f).coerceAtLeast(1f)
+            val next = ((zoomRatios[selection] ?: 1f) * factor).coerceIn(1f, maxZoom)
+            zoomRatios[selection] = next
+            val device = devices[selection] ?: return
+            val session = sessions[selection] ?: return
+            val target = targets[selection] ?: return
+            runCatching {
+                val active = chars.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+                val requestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                    addTarget(target.surface)
+                    if (active != null) {
+                        val width = (active.width() / next).toInt().coerceAtLeast(1)
+                        val height = (active.height() / next).toInt().coerceAtLeast(1)
+                        val left = active.centerX() - width / 2
+                        val top = active.centerY() - height / 2
+                        set(CaptureRequest.SCALER_CROP_REGION, Rect(left, top, left + width, top + height))
+                    }
+                }
+                session.setRepeatingRequest(requestBuilder.build(), null, null)
+            }.onFailure {
+                lastError = "Zoom " + selection.name.lowercase() + " impossible : " + (it.message ?: "erreur Camera2")
+            }
+        }
+    }
 
     fun close() {
         synchronized(this) {

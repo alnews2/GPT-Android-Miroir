@@ -23,6 +23,7 @@ class SingleRtspServerStream(
     NoAudioSource()
 ) {
     private val rtspServer = RtspServer(connectChecker, port)
+    private var zoomRatio = 1f
 
     init {
         rtspServer.setOnlyVideo(true)
@@ -38,6 +39,12 @@ class SingleRtspServerStream(
 
     fun switchCamera() {
         (videoSource as Camera2Source).switchCamera()
+    }
+
+    fun adjustZoom(factor: Float) {
+        if (!factor.isFinite() || factor <= 0f) return
+        zoomRatio = (zoomRatio * factor).coerceIn(1f, 8f)
+        (videoSource as Camera2Source).setZoom(zoomRatio)
     }
 
     fun currentCamera(): CameraSelection =
