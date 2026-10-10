@@ -26,6 +26,7 @@ class SingleRtspServerStream(
     Camera2Source(context),
     NoAudioSource()
 ) {
+    private val appContext = context
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
 
@@ -50,7 +51,7 @@ class SingleRtspServerStream(
                 val source = videoSource as Camera2Source
                 val cameraId = source.getCurrentCameraId()
                 runCatching {
-                    val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+                    val manager = appContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
                     val characteristics = manager.getCameraCharacteristics(cameraId)
                     Log.i(
                         TAG,
