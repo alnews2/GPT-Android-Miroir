@@ -42,7 +42,7 @@ class SingleRtspServerStream(
 
     fun switchCamera() {
         (videoSource as Camera2Source).switchCamera()
-        if ((videoSource as Camera2Source).isRunning) {
+        if ((videoSource as Camera2Source).isRunning()) {
             (videoSource as Camera2Source).enableAutoExposure()
         }
     }
