@@ -18,6 +18,9 @@ class RtspStreamManager(
     private var configuration: RtspConfiguration? = null
     private var selectedCamera = CameraSelection.REAR
     private var previewSurfaceReady = false
+    // The SurfaceHolder may report both surfaceCreated and surfaceChanged for the same surface.
+    // Keep track of the stream already attached so those callbacks do not restart the camera.
+    private var previewAttachedTo: CameraSelection? = null
     private var singleCameraMode = false
 
     var lastError: String? = null
@@ -244,6 +247,11 @@ class RtspStreamManager(
 
     private fun attachPreview(selection: CameraSelection) {
         if (!previewSurfaceReady) return
+        // surfaceChanged can follow surfaceCreated without the preview needing to restart.
+        if (previewAttachedTo == selection) return
+
+        // Never leave a different stream attached to the same preview surface.
+        previewAttachedTo?.let(::detachPreview)
 
         val stream = if (singleCameraMode) {
             if (selectedCamera != selection) return
@@ -260,13 +268,19 @@ class RtspStreamManager(
 
         runCatching {
             stream.startPreview(previewView)
+            previewAttachedTo = selection
         }.onFailure { error ->
+            previewAttachedTo = null
             lastError = selection.name.lowercase() + ": " +
                 (error.message ?: "échec de l'affichage de la prévisualisation")
         }
     }
 
     private fun detachPreview(selection: CameraSelection) {
+        // Ignore stale detach requests; they must not stop another camera's preview.
+        if (previewAttachedTo != selection) return
+        previewAttachedTo = null
+
         val stream = if (singleCameraMode) {
             singleStream
         } else {
