@@ -31,6 +31,9 @@ class SingleRtspServerStream(
 
     fun startStream() {
         super.startStream("")
+        // RootEncoder owns the Camera2 capture request in single-camera mode.
+        // Explicitly enable AE through its public API after the camera starts.
+        (videoSource as Camera2Source).enableAutoExposure()
     }
 
     fun startPreview(view: OpenGlView) {
@@ -39,6 +42,9 @@ class SingleRtspServerStream(
 
     fun switchCamera() {
         (videoSource as Camera2Source).switchCamera()
+        if ((videoSource as Camera2Source).isRunning) {
+            (videoSource as Camera2Source).enableAutoExposure()
+        }
     }
 
     fun adjustZoom(factor: Float) {
