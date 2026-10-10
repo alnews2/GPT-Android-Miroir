@@ -10,6 +10,8 @@ import com.pedro.common.VideoCodec
 import com.pedro.encoder.input.sources.audio.NoAudioSource
 import com.pedro.encoder.input.sources.video.Camera2Source
 import com.pedro.encoder.input.video.CameraCallbacks
+import com.pedro.encoder.input.video.FrameCapturedCallback
+import com.pedro.encoder.input.video.CameraHelper
 import com.pedro.library.base.StreamBase
 import com.pedro.library.view.OpenGlView
 import com.pedro.rtspserver.server.RtspServer
@@ -27,34 +29,43 @@ class SingleRtspServerStream(
 ) {
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
+    @Volatile private var needsAutomaticExposure = true
 
     init {
         rtspServer.setOnlyVideo(true)
 
         val camera = videoSource as Camera2Source
 
-        // Apply AE to every Camera2 capture request. Calling enableAutoExposure()
-        // after onCameraOpened() can still be too early: RootEncoder opens the
-        // device and configures its repeating capture session asynchronously.
-        // A custom request is retained by Camera2 and reapplied to subsequent
-        // requests, including after the camera is switched.
-        val customRequestAccepted = camera.setCustomRequest { request ->
-            request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-            request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-        }
-        if (customRequestAccepted) {
-            Log.i(TAG, "Automatic exposure requested for every Camera2 capture request")
-        } else {
-            Log.e(TAG, "RootEncoder rejected the automatic-exposure capture request")
-        }
+        // RootEncoder requires setCustomRequest() to be called after the camera
+        // has started. The first capture callback is late enough for its capture
+        // session and repeating request to exist; apply AE there, not in init.
+        camera.enableFrameCaptureCallback(object : FrameCapturedCallback {
+            override fun onFrameCaptured(frameNumber: Long, timestamp: Long) {
+                if (!needsAutomaticExposure) return
+
+                val accepted = camera.setCustomRequest { request ->
+                    request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                    request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                }
+                if (accepted) {
+                    needsAutomaticExposure = false
+                    Log.i(TAG, "Automatic exposure applied to active Camera2 repeating request (frame $frameNumber)")
+                } else {
+                    Log.w(TAG, "Camera2 session not ready for automatic exposure yet; will retry")
+                }
+            }
+        })
 
         camera.setCameraCallback(object : CameraCallbacks {
             override fun onCameraOpened() {
-                Log.i(TAG, "Camera2 opened: ${camera.getCameraFacing()}, automatic exposure request installed")
+                // A camera switch rebuilds the capture request and session.
+                needsAutomaticExposure = true
+                Log.i(TAG, "Camera2 opened: ${camera.getCameraFacing()}; waiting for first capture to apply AE")
             }
 
-            override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) {
-                Log.i(TAG, "Camera2 changed to $facing; automatic exposure remains configured")
+            override fun onCameraChanged(facing: CameraHelper.Facing) {
+                needsAutomaticExposure = true
+                Log.i(TAG, "Camera2 changed to $facing; automatic exposure will be applied to the new session")
             }
 
             override fun onCameraError(error: String) {
