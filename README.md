@@ -7,6 +7,7 @@ Application Android autonome développée en Kotlin avec Jetpack Compose et Came
 - Affichage vidéo en temps réel de la caméra arrière au démarrage.
 - Menu vertical `⋮` en haut à droite.
 - Choix de la caméra avant ou arrière sans quitter l'application.
+- Zoom par pincement à deux doigts sur l'aperçu, pour les caméras avant et arrière et dans les deux orientations.
 - Serveur RTSP intégré avec deux flux indépendants avant/arrière.
 - Configuration persistante des ports RTSP, de la résolution, du nombre d'images par seconde et du débit.
 - Commande `Configurer RTSP` dans le menu.
