@@ -1,7 +1,6 @@
 package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
-import android.hardware.camera2.CaptureRequest
 import android.media.MediaCodec
 import android.util.Log
 import com.pedro.common.AudioCodec
@@ -43,15 +42,20 @@ class SingleRtspServerStream(
             override fun onFrameCaptured(frameNumber: Long, timestamp: Long) {
                 if (!needsAutomaticExposure) return
 
-                val accepted = camera.setCustomRequest { request ->
-                    request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-                    request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                }
+                val accepted = camera.enableAutoExposure()
                 if (accepted) {
                     needsAutomaticExposure = false
-                    Log.i(TAG, "Automatic exposure applied to active Camera2 repeating request (frame $frameNumber)")
+                    Log.i(
+                        TAG,
+                        "Camera2 automatic exposure enabled: cameraId=${camera.getCurrentCameraId()}, " +
+                            "frame=$frameNumber, enabled=${camera.isAutoExposureEnabled()}"
+                    )
                 } else {
-                    Log.w(TAG, "Camera2 session not ready for automatic exposure yet; will retry")
+                    Log.e(
+                        TAG,
+                        "Camera2 rejected automatic exposure: cameraId=${camera.getCurrentCameraId()}, " +
+                            "running=${camera.isRunning()}; will retry"
+                    )
                 }
             }
         })
@@ -60,7 +64,7 @@ class SingleRtspServerStream(
             override fun onCameraOpened() {
                 // A camera switch rebuilds the capture request and session.
                 needsAutomaticExposure = true
-                Log.i(TAG, "Camera2 opened: ${camera.getCameraFacing()}; waiting for first capture to apply AE")
+                Log.i(TAG, "Camera2 opened: facing=${camera.getCameraFacing()}, id=${camera.getCurrentCameraId()}; waiting to enable AE")
             }
 
             override fun onCameraChanged(facing: CameraHelper.Facing) {
