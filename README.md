@@ -1,4 +1,6 @@
-# GPT-Android-Miroir
+# Miroir Android
+
+Application Android autonome de prévisualisation caméra et de diffusion vidéo RTSP.
 
 Application Android standalone développée en Kotlin avec Jetpack Compose et un pipeline Camera2/RTSP.
 
@@ -27,9 +29,11 @@ Les tests unitaires couvrent notamment la validation des ports, l'activation des
 ## Intégration continue et publications
 
 - Chaque pull request vers `main` déclenche les tests unitaires et la compilation de vérification.
-- Chaque mise à jour de `main` (normalement après la fusion d'une pull request) déclenche les tests puis la compilation de l'APK.
-- Si les vérifications réussissent, GitHub Actions crée automatiquement un tag Git et une Release GitHub avec des notes générées à partir des pull requests et un APK téléchargeable.
-- La première version stable est `v1.0.0`. Les publications suivantes incrémentent automatiquement le numéro de correctif (`v1.0.1`, `v1.0.2`, etc.).
+- Chaque mise à jour de `main` déclenche l'analyse des commits depuis la dernière release.
+- Les commits suivent la convention [Conventional Commits](https://www.conventionalcommits.org/) : `feat:` pour une fonctionnalité, `fix:` pour une correction, `perf:` pour une amélioration de performance, et `!` ou `BREAKING CHANGE:` pour une rupture de compatibilité.
+- Le versionnement suit [Semantic Versioning (SemVer)](https://semver.org/lang/fr/) : rupture de compatibilité → MAJOR, `feat` → MINOR, `fix`/`perf` → PATCH. Les commits `docs`, `test`, `ci`, `build` ou `chore` seuls ne déclenchent pas de nouvelle release.
+- Si les tests et la compilation réussissent, GitHub Actions crée le tag Git et la Release avec notes générées automatiquement et APK téléchargeable.
+- La première version stable publiée est `v1.0.0`; les prochaines versions sont calculées selon les commits conventionnels depuis ce tag.
 - Le nom de version Android et le `versionCode` sont injectés par le workflow de publication ; les compilations locales conservent les valeurs par défaut du projet.
 
 Le développement se fait dans une branche dédiée. La fusion vers `main` reste manuelle après validation.
