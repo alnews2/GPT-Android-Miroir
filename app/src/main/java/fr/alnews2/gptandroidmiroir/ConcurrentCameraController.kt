@@ -73,6 +73,7 @@ class ConcurrentCameraController(context: Context) {
             runCatching {
                 val active = chars.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
                 val requestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                    configureAutomaticExposure(this, chars)
                     addTarget(target.surface)
                     if (active != null) {
                         val width = (active.width() / next).toInt().coerceAtLeast(1)
@@ -203,8 +204,23 @@ class ConcurrentCameraController(context: Context) {
                     synchronized(this@ConcurrentCameraController) {
                         sessions[selection] = session
                         runCatching {
+                            val cameraId = ids[selection]
+                                ?: error("Identifiant caméra introuvable")
+                            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
                             val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
-                                .apply { addTarget(target.surface) }.build()
+                                .apply {
+                                    configureAutomaticExposure(this, characteristics)
+                                    addTarget(target.surface)
+                                    val zoom = zoomRatios[selection] ?: 1f
+                                    val active = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+                                    if (active != null && zoom > 1f) {
+                                        val width = (active.width() / zoom).toInt().coerceAtLeast(1)
+                                        val height = (active.height() / zoom).toInt().coerceAtLeast(1)
+                                        val left = active.centerX() - width / 2
+                                        val top = active.centerY() - height / 2
+                                        set(CaptureRequest.SCALER_CROP_REGION, Rect(left, top, left + width, top + height))
+                                    }
+                                }.build()
                             session.setRepeatingRequest(request, null, null)
                             running += selection
                         }.onFailure {
@@ -224,6 +240,26 @@ class ConcurrentCameraController(context: Context) {
         runCatching { device.createCaptureSession(configuration) }.onFailure {
             lastError = "${selection.name.lowercase()}: " +
                 (it.message ?: "échec de création de session")
+        }
+    }
+
+    /**
+     * Force automatic exposure on each Camera2 request instead of relying on
+     * device-specific defaults from TEMPLATE_RECORD. Only use modes advertised
+     * by the camera so unusual devices can still start their capture session.
+     */
+    private fun configureAutomaticExposure(
+        request: CaptureRequest.Builder,
+        characteristics: CameraCharacteristics
+    ) {
+        val controlModes = characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_MODES)
+        if (controlModes?.contains(CaptureRequest.CONTROL_MODE_AUTO) == true) {
+            request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+        }
+
+        val aeModes = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)
+        if (aeModes?.contains(CaptureRequest.CONTROL_AE_MODE_ON) == true) {
+            request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
         }
     }
 
