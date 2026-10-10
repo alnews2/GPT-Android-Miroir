@@ -6,10 +6,12 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
 import android.graphics.Rect
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.os.Build
+import android.util.Log
 import android.view.Surface
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -24,6 +26,8 @@ class ConcurrentCameraController(context: Context) {
     private val devices = mutableMapOf<CameraSelection, CameraDevice>()
     private val sessions = mutableMapOf<CameraSelection, CameraCaptureSession>()
     private val running = mutableSetOf<CameraSelection>()
+    private data class ExposureSnapshot(val state: Int?, val exposureTimeNs: Long?, val sensitivityIso: Int?)
+    private val lastExposureSnapshots = mutableMapOf<CameraSelection, ExposureSnapshot>()
     private val zoomRatios = mutableMapOf(CameraSelection.REAR to 1f, CameraSelection.FRONT to 1f)
 
     @Volatile var lastError: String? = null
@@ -83,7 +87,19 @@ class ConcurrentCameraController(context: Context) {
                         set(CaptureRequest.SCALER_CROP_REGION, Rect(left, top, left + width, top + height))
                     }
                 }
-                session.setRepeatingRequest(requestBuilder.build(), null, null)
+                session.setRepeatingRequest(
+                    requestBuilder.build(),
+                    object : CameraCaptureSession.CaptureCallback() {
+                        override fun onCaptureCompleted(
+                            session: CameraCaptureSession,
+                            request: CaptureRequest,
+                            result: android.hardware.camera2.TotalCaptureResult
+                        ) {
+                            reportExposureResult(selection, result)
+                        }
+                    },
+                    executor
+                )
             }.onFailure {
                 lastError = "Zoom " + selection.name.lowercase() + " impossible : " + (it.message ?: "erreur Camera2")
             }
@@ -221,7 +237,25 @@ class ConcurrentCameraController(context: Context) {
                                         set(CaptureRequest.SCALER_CROP_REGION, Rect(left, top, left + width, top + height))
                                     }
                                 }.build()
-                            session.setRepeatingRequest(request, null, null)
+                            session.setRepeatingRequest(
+                                request,
+                                object : CameraCaptureSession.CaptureCallback() {
+                                    override fun onCaptureCompleted(
+                                        session: CameraCaptureSession,
+                                        request: CaptureRequest,
+                                        result: android.hardware.camera2.TotalCaptureResult
+                                    ) {
+                                        reportExposureResult(selection, result)
+                                    }
+                                },
+                                executor
+                            )
+                            Log.i(
+                                TAG,
+                                "${selection.name} AE request started: cameraId=$cameraId, " +
+                                    "controlModes=${characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_MODES)?.contentToString()}, " +
+                                    "aeModes=${characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)?.contentToString()}"
+                            )
                             running += selection
                         }.onFailure {
                             lastError = "${selection.name.lowercase()}: " +
@@ -248,6 +282,35 @@ class ConcurrentCameraController(context: Context) {
      * device-specific defaults from TEMPLATE_RECORD. Only use modes advertised
      * by the camera so unusual devices can still start their capture session.
      */
+    private fun reportExposureResult(
+        selection: CameraSelection,
+        result: android.hardware.camera2.TotalCaptureResult
+    ) {
+        val snapshot = ExposureSnapshot(
+            state = result.get(CaptureResult.CONTROL_AE_STATE),
+            exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME),
+            sensitivityIso = result.get(CaptureResult.SENSOR_SENSITIVITY)
+        )
+        synchronized(lastExposureSnapshots) {
+            val previous = lastExposureSnapshots[selection]
+            val exposureChanged = previous?.exposureTimeNs != null && snapshot.exposureTimeNs != null &&
+                relativeChange(previous.exposureTimeNs.toDouble(), snapshot.exposureTimeNs.toDouble()) >= 0.20
+            val sensitivityChanged = previous?.sensitivityIso != null && snapshot.sensitivityIso != null &&
+                relativeChange(previous.sensitivityIso.toDouble(), snapshot.sensitivityIso.toDouble()) >= 0.20
+            if (previous == null || previous.state != snapshot.state || exposureChanged || sensitivityChanged) {
+                Log.i(
+                    TAG,
+                    "${selection.name} AE result: state=${snapshot.state}, " +
+                        "exposureNs=${snapshot.exposureTimeNs}, iso=${snapshot.sensitivityIso}"
+                )
+                lastExposureSnapshots[selection] = snapshot
+            }
+        }
+    }
+
+    private fun relativeChange(old: Double, current: Double): Double =
+        if (old == 0.0) if (current == 0.0) 0.0 else 1.0 else kotlin.math.abs(current - old) / old
+
     private fun configureAutomaticExposure(
         request: CaptureRequest.Builder,
         characteristics: CameraCharacteristics
@@ -260,6 +323,8 @@ class ConcurrentCameraController(context: Context) {
         val aeModes = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)
         if (aeModes?.contains(CaptureRequest.CONTROL_AE_MODE_ON) == true) {
             request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+        } else {
+            Log.e(TAG, "Camera ${characteristics.get(CameraCharacteristics.LENS_FACING)} does not advertise AE_MODE_ON; AE modes=${aeModes?.contentToString()}")
         }
     }
 
@@ -269,6 +334,10 @@ class ConcurrentCameraController(context: Context) {
         sessions.clear()
         devices.clear()
         running.clear()
+    }
+
+    private companion object {
+        const val TAG = "ConcurrentCameraController"
     }
 
     private class EmptySessionCallback : CameraCaptureSession.StateCallback() {
