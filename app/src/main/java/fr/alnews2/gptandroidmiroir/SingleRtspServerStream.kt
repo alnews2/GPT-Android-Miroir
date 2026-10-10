@@ -35,15 +35,15 @@ class SingleRtspServerStream(
             override fun onCameraOpened() {
                 val enabled = (videoSource as Camera2Source).enableAutoExposure()
                 if (enabled) {
-                    Log.i(TAG, "Automatic exposure enabled for ${(videoSource as Camera2Source).getCameraFacing()}")
+                    Log.i("SingleRtspServerStream", "Automatic exposure enabled for ${(videoSource as Camera2Source).getCameraFacing()}")
                 } else {
-                    Log.w(TAG, "RootEncoder could not enable automatic exposure for ${(videoSource as Camera2Source).getCameraFacing()}")
+                    Log.w("SingleRtspServerStream", "RootEncoder could not enable automatic exposure for ${(videoSource as Camera2Source).getCameraFacing()}")
                 }
             }
 
             override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) = Unit
             override fun onCameraError(error: String) {
-                Log.e(TAG, "Camera2 error: $error")
+                Log.e("SingleRtspServerStream", "Camera2 error: $error")
             }
             override fun onCameraDisconnected() {
                 Log.w(TAG, "Camera2 disconnected")
