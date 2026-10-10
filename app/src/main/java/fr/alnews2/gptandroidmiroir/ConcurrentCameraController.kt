@@ -100,9 +100,9 @@ class ConcurrentCameraController(context: Context) {
                         ) {
                             reportExposureResult(selection, result)
                         }
-                    }
-                )    cameraCallbackHandler
-$3
+                    },
+                    cameraCallbackHandler
+                )
             }.onFailure {
                 lastError = "Zoom " + selection.name.lowercase() + " impossible : " + (it.message ?: "erreur Camera2")
             }
@@ -250,9 +250,9 @@ $3
                                     ) {
                                         reportExposureResult(selection, result)
                                     }
-                                }
-                )    cameraCallbackHandler
-$3
+                                },
+                                cameraCallbackHandler
+                            )
                             Log.i(
                                 TAG,
                                 "${selection.name} AE request started: cameraId=$cameraId, " +
