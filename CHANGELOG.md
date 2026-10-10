@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-- application de l'exposition automatique (AE) à chaque requête de capture Camera2 en mode à caméra unique via RootEncoder `setCustomRequest`, afin que le réglage survive à l'ouverture asynchrone et au changement de caméra ; activation AE conservée dans les requêtes du mode simultané, y compris après application du zoom.
+- correction de l'activation AE en mode à caméra unique : `setCustomRequest()` était appelé dans le constructeur, avant que RootEncoder ne crée sa requête et sa session de capture, et renvoyait donc `false`. L'AE est désormais appliquée au premier rappel de capture, quand la session répétée existe, puis réappliquée après un changement de caméra ; activation AE conservée dans les requêtes du mode simultané, y compris après application du zoom.
 - ajout du zoom par pincement à deux doigts, appliqué à la capture pour l'aperçu et le flux RTSP, en portrait comme en paysage.
 - ajout du titre « Miroir Android » en haut de la fenêtre principale et d'une nouvelle icône adaptative évoquant le téléphone, la caméra et le miroir.
 - adoption de SemVer et des Conventional Commits pour déterminer automatiquement le niveau de version publié.
