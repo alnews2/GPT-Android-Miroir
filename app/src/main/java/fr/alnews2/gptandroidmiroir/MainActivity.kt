@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -123,7 +125,11 @@ private fun CameraApp(onQuit: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         CameraPreview(
             previewView = previewView,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().pointerInput(streamManager) {
+                detectTransformGestures { _, _, zoomChange, _ ->
+                    if (zoomChange != 1f) streamManager.adjustZoom(zoomChange)
+                }
+            }
         )
 
         if (streamError != null) {
