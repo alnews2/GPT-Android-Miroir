@@ -36,7 +36,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("com.github.pedroSG94:RTSP-Server:1.3.6")
-    // 2.8.1 adds a Camera2 capture-result callback for diagnosing actual sensor exposure and ISO.
-    implementation("com.github.pedroSG94.RootEncoder:library:2.8.1")
+    implementation("com.github.pedroSG94.RootEncoder:library:2.6.1")
     testImplementation("junit:junit:4.13.2")
 }
