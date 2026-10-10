@@ -39,28 +39,59 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Calculate release version
+      - name: Calculate release version from Conventional Commits
         id: version
         shell: bash
         run: |
           git fetch --tags --force
           latest_tag="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
-          if [[ -z "$latest_tag" ]]; then
-            version="1.0.0"
-          elif [[ "$latest_tag" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+
+          if [[ -n "$latest_tag" ]]; then
+            if [[ ! "$latest_tag" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              echo "Le dernier tag '$latest_tag' n'est pas au format SemVer." >&2
+              exit 1
+            fi
             major="${BASH_REMATCH[1]}"
             minor="${BASH_REMATCH[2]}"
             patch="${BASH_REMATCH[3]}"
-            if (( major == 0 )); then
-              version="1.0.0"
-            else
-              version="${major}.${minor}.$((patch + 1))"
-            fi
+            range="${latest_tag}..HEAD"
           else
-            echo "Le dernier tag '$latest_tag' n'est pas au format semver vMAJOR.MINOR.PATCH." >&2
-            exit 1
+            major=0
+            minor=0
+            patch=0
+            range=""
           fi
-          IFS='.' read -r major minor patch <<< "$version"
+
+          if [[ -n "$range" ]]; then
+            messages="$(git log "$range" --pretty=format:'%s%n%b%n---END-COMMIT---')"
+          else
+            messages="$(git log --pretty=format:'%s%n%b%n---END-COMMIT---')"
+          fi
+
+          if [[ -z "$messages" ]]; then
+            echo "Aucun commit depuis la dernière release ; aucune publication nécessaire."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Conventional Commits: breaking change > feat (minor) > fix/perf (patch).
+          if grep -Eq '^[[:alnum:]-]+(\([^)]*\))?!:' <<< "$messages" ||
+             grep -Eq '^BREAKING CHANGE:' <<< "$messages"; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif grep -Eq '^feat(\([^)]*\))?:' <<< "$messages"; then
+            minor=$((minor + 1))
+            patch=0
+          elif grep -Eq '^(fix|perf)(\([^)]*\))?:' <<< "$messages"; then
+            patch=$((patch + 1))
+          else
+            echo "Aucun commit Conventional Commit publiable (feat/fix/perf ou breaking change)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          version="${major}.${minor}.${patch}"
           version_code=$((major * 1000000 + minor * 1000 + patch))
           tag="v${version}"
           if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
@@ -70,18 +101,23 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "version_code=${version_code}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "Publication prévue : ${tag} (versionCode ${version_code})"
 
       - name: Run unit tests
+        if: steps.version.outputs.skip != 'true'
         run: gradle -PreleaseVersionName="${{ steps.version.outputs.version }}" -PreleaseVersionCode="${{ steps.version.outputs.version_code }}" test
 
       - name: Build APK
+        if: steps.version.outputs.skip != 'true'
         run: gradle -PreleaseVersionName="${{ steps.version.outputs.version }}" -PreleaseVersionCode="${{ steps.version.outputs.version_code }}" assembleDebug
 
       - name: Prepare release APK
+        if: steps.version.outputs.skip != 'true'
         run: cp app/build/outputs/apk/debug/app-debug.apk "GPT-Android-Miroir-${{ steps.version.outputs.tag }}.apk"
 
       - name: Create GitHub Release
+        if: steps.version.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
