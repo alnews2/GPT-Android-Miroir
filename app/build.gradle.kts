@@ -37,6 +37,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("com.github.pedroSG94:RTSP-Server:1.3.6")
     // 2.6.6 adds setCustomRequest(), allowing AE to be enforced on each Camera2 request.
-    implementation("com.github.pedroSG94.RootEncoder:library:2.6.6")
+    implementation("com.github.pedroSG94.RootEncoder:library:2.8.1")
     testImplementation("junit:junit:4.13.2")
 }
