@@ -2,11 +2,13 @@ package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
 import android.media.MediaCodec
+import android.util.Log
 import com.pedro.common.AudioCodec
 import com.pedro.common.ConnectChecker
 import com.pedro.common.VideoCodec
 import com.pedro.encoder.input.sources.audio.NoAudioSource
 import com.pedro.encoder.input.sources.video.Camera2Source
+import com.pedro.encoder.input.video.CameraCallbacks
 import com.pedro.library.base.StreamBase
 import com.pedro.library.view.OpenGlView
 import com.pedro.rtspserver.server.RtspServer
@@ -27,13 +29,30 @@ class SingleRtspServerStream(
 
     init {
         rtspServer.setOnlyVideo(true)
+        // Camera2 opens asynchronously. Apply AE from the opened callback, not
+        // immediately after startStream(), when RootEncoder may not be ready yet.
+        (videoSource as Camera2Source).setCameraCallback(object : CameraCallbacks {
+            override fun onCameraOpened() {
+                val enabled = (videoSource as Camera2Source).enableAutoExposure()
+                if (enabled) {
+                    Log.i(TAG, "Automatic exposure enabled for ${(videoSource as Camera2Source).getCameraFacing()}")
+                } else {
+                    Log.w(TAG, "RootEncoder could not enable automatic exposure for ${(videoSource as Camera2Source).getCameraFacing()}")
+                }
+            }
+
+            override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) = Unit
+            override fun onCameraError(error: String) {
+                Log.e(TAG, "Camera2 error: $error")
+            }
+            override fun onCameraDisconnected() {
+                Log.w(TAG, "Camera2 disconnected")
+            }
+        })
     }
 
     fun startStream() {
         super.startStream("")
-        // RootEncoder owns the Camera2 capture request in single-camera mode.
-        // Explicitly enable AE through its public API after the camera starts.
-        (videoSource as Camera2Source).enableAutoExposure()
     }
 
     fun startPreview(view: OpenGlView) {
@@ -41,10 +60,9 @@ class SingleRtspServerStream(
     }
 
     fun switchCamera() {
+        // switchCamera() closes and reopens Camera2 asynchronously. The same
+        // onCameraOpened callback reapplies automatic exposure to the new lens.
         (videoSource as Camera2Source).switchCamera()
-        if ((videoSource as Camera2Source).isRunning()) {
-            (videoSource as Camera2Source).enableAutoExposure()
-        }
     }
 
     fun adjustZoom(factor: Float) {
