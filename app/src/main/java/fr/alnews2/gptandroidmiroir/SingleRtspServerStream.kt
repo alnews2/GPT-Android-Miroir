@@ -2,6 +2,8 @@ package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
 import android.media.MediaCodec
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.pedro.common.AudioCodec
 import com.pedro.common.ConnectChecker
@@ -28,26 +30,17 @@ class SingleRtspServerStream(
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
     private val autoExposureAttempted = AtomicBoolean(false)
+    private val cameraHandler = Handler(Looper.getMainLooper())
 
     init {
         rtspServer.setOnlyVideo(true)
         // Camera2 opens and configures its capture session asynchronously.
-        // Wait for the first completed capture before applying AE: onCameraOpened()
-        // fires before the repeating capture session is necessarily ready.
-        (videoSource as Camera2Source).setCustomOnCaptureCompletedCallback { _, _, _ ->
-            if (autoExposureAttempted.compareAndSet(false, true)) {
-                val camera = videoSource as Camera2Source
-                val enabled = camera.enableAutoExposure()
-                if (enabled) {
-                    Log.i("SingleRtspServerStream", "Automatic exposure enabled for ${camera.getCameraFacing()}")
-                } else {
-                    Log.w("SingleRtspServerStream", "RootEncoder could not enable automatic exposure for ${camera.getCameraFacing()}")
-                }
-            }
-        }
+        // Retry briefly after onCameraOpened(), because RootEncoder can notify
+        // that the device is open before its repeating capture session is ready.
         (videoSource as Camera2Source).setCameraCallback(object : CameraCallbacks {
             override fun onCameraOpened() {
                 autoExposureAttempted.set(false)
+                enableAutoExposureWhenReady(attempt = 0)
             }
 
             override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) = Unit
@@ -58,6 +51,21 @@ class SingleRtspServerStream(
                 Log.w("SingleRtspServerStream", "Camera2 disconnected")
             }
         })
+    }
+
+    private fun enableAutoExposureWhenReady(attempt: Int) {
+        if (autoExposureAttempted.get()) return
+        val camera = videoSource as Camera2Source
+        if (camera.isRunning() && camera.enableAutoExposure()) {
+            autoExposureAttempted.set(true)
+            Log.i("SingleRtspServerStream", "Automatic exposure enabled for ${camera.getCameraFacing()}")
+            return
+        }
+        if (attempt < 10) {
+            cameraHandler.postDelayed({ enableAutoExposureWhenReady(attempt + 1) }, 100L)
+        } else {
+            Log.w("SingleRtspServerStream", "Automatic exposure could not be enabled after camera startup")
+        }
     }
 
     fun startStream() {
