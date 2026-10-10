@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- ajout du zoom par pincement à deux doigts, appliqué à la capture pour l'aperçu et le flux RTSP, en portrait comme en paysage.
 - ajout du titre « Miroir Android » en haut de la fenêtre principale et d'une nouvelle icône adaptative évoquant le téléphone, la caméra et le miroir.
 - adoption de SemVer et des Conventional Commits pour déterminer automatiquement le niveau de version publié.
 - remplacement de l'architecture double `RtspServerCamera2` par deux sources Camera2 coordonnées via l'API Android de capture concurrente.
