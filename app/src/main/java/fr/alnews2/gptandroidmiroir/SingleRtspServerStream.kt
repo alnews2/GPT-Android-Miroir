@@ -1,6 +1,7 @@
 package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
+import android.hardware.camera2.CaptureResult
 import android.media.MediaCodec
 import android.util.Log
 import com.pedro.common.AudioCodec
@@ -29,6 +30,12 @@ class SingleRtspServerStream(
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
     @Volatile private var needsAutomaticExposure = true
+    private data class ExposureSnapshot(
+        val aeState: Int?,
+        val exposureTimeNs: Long?,
+        val sensitivityIso: Int?
+    )
+    @Volatile private var lastExposureSnapshot: ExposureSnapshot? = null
 
     init {
         rtspServer.setOnlyVideo(true)
@@ -84,15 +91,46 @@ class SingleRtspServerStream(
             }
         })
 
+        // RootEncoder 2.8.1 exposes completed Camera2 results. Log the actual
+        // sensor values only when AE state changes or exposure/ISO moves materially.
+        camera.setCustomOnCaptureCompletedCallback { _, _, result ->
+            val snapshot = ExposureSnapshot(
+                aeState = result.get(CaptureResult.CONTROL_AE_STATE),
+                exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME),
+                sensitivityIso = result.get(CaptureResult.SENSOR_SENSITIVITY)
+            )
+            val previous = lastExposureSnapshot
+            val exposureChanged = previous?.exposureTimeNs != null &&
+                snapshot.exposureTimeNs != null &&
+                relativeChange(previous.exposureTimeNs.toDouble(), snapshot.exposureTimeNs.toDouble()) >= 0.20
+            val sensitivityChanged = previous?.sensitivityIso != null &&
+                snapshot.sensitivityIso != null &&
+                relativeChange(previous.sensitivityIso.toDouble(), snapshot.sensitivityIso.toDouble()) >= 0.20
+
+            if (previous == null || previous.aeState != snapshot.aeState ||
+                exposureChanged || sensitivityChanged
+            ) {
+                Log.i(
+                    TAG,
+                    "Camera2 AE capture result: cameraId=${camera.getCurrentCameraId()}, " +
+                        "state=${snapshot.aeState}, exposureNs=${snapshot.exposureTimeNs}, " +
+                        "iso=${snapshot.sensitivityIso}"
+                )
+                lastExposureSnapshot = snapshot
+            }
+        }
+
         camera.setCameraCallback(object : CameraCallbacks {
             override fun onCameraOpened() {
                 // A camera switch rebuilds the capture request and session.
                 needsAutomaticExposure = true
+                lastExposureSnapshot = null
                 Log.i(TAG, "Camera2 opened: facing=${camera.getCameraFacing()}, id=${camera.getCurrentCameraId()}; waiting to enable AE")
             }
 
             override fun onCameraChanged(facing: CameraHelper.Facing) {
                 needsAutomaticExposure = true
+                lastExposureSnapshot = null
                 Log.i(TAG, "Camera2 changed to $facing; automatic exposure will be applied to the new session")
             }
 
@@ -166,6 +204,9 @@ class SingleRtspServerStream(
     override fun setAudioCodecImp(codec: AudioCodec) {
         rtspServer.setAudioCodec(codec)
     }
+
+    private fun relativeChange(old: Double, current: Double): Double =
+        if (old == 0.0) if (current == 0.0) 0.0 else 1.0 else kotlin.math.abs(current - old) / old
 
     private companion object {
         const val TAG = "SingleRtspServerStream"
