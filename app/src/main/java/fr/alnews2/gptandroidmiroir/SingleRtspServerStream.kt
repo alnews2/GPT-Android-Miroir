@@ -78,7 +78,7 @@ class SingleRtspServerStream(
                         "Camera2 AE request applied: cameraId=${camera.getCurrentCameraId()}, " +
                             "frame=$frameNumber, controlMode=AUTO, aeMode=ON, aeLock=false, " +
                             "exposureCompensation=0, apiEnabled=${camera.isAutoExposureEnabled()}. " +
-                            "RootEncoder 2.6.6 does not expose TotalCaptureResult for this single-camera source."
+                            "RootEncoder 2.8.1 capture-result callback is used to log sensor exposure and ISO."
                     )
                 } else {
                     Log.e(
