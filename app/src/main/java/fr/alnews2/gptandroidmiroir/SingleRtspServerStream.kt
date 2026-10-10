@@ -14,6 +14,7 @@ import com.pedro.library.view.OpenGlView
 import com.pedro.rtspserver.server.RtspServer
 import com.pedro.rtspserver.util.RtspServerStreamClient
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SingleRtspServerStream(
     context: Context,
@@ -26,19 +27,27 @@ class SingleRtspServerStream(
 ) {
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
+    private val autoExposureAttempted = AtomicBoolean(false)
 
     init {
         rtspServer.setOnlyVideo(true)
-        // Camera2 opens asynchronously. Apply AE from the opened callback, not
-        // immediately after startStream(), when RootEncoder may not be ready yet.
+        // Camera2 opens and configures its capture session asynchronously.
+        // Wait for the first completed capture before applying AE: onCameraOpened()
+        // fires before the repeating capture session is necessarily ready.
+        (videoSource as Camera2Source).setCustomOnCaptureCompletedCallback { _, _, _ ->
+            if (autoExposureAttempted.compareAndSet(false, true)) {
+                val camera = videoSource as Camera2Source
+                val enabled = camera.enableAutoExposure()
+                if (enabled) {
+                    Log.i("SingleRtspServerStream", "Automatic exposure enabled for ${camera.getCameraFacing()}")
+                } else {
+                    Log.w("SingleRtspServerStream", "RootEncoder could not enable automatic exposure for ${camera.getCameraFacing()}")
+                }
+            }
+        }
         (videoSource as Camera2Source).setCameraCallback(object : CameraCallbacks {
             override fun onCameraOpened() {
-                val enabled = (videoSource as Camera2Source).enableAutoExposure()
-                if (enabled) {
-                    Log.i("SingleRtspServerStream", "Automatic exposure enabled for ${(videoSource as Camera2Source).getCameraFacing()}")
-                } else {
-                    Log.w("SingleRtspServerStream", "RootEncoder could not enable automatic exposure for ${(videoSource as Camera2Source).getCameraFacing()}")
-                }
+                autoExposureAttempted.set(false)
             }
 
             override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) = Unit
