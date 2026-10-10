@@ -1,12 +1,16 @@
 package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.util.Log
 import android.media.MediaCodec
 import com.pedro.common.AudioCodec
 import com.pedro.common.ConnectChecker
 import com.pedro.common.VideoCodec
 import com.pedro.encoder.input.sources.audio.NoAudioSource
 import com.pedro.encoder.input.sources.video.Camera2Source
+import com.pedro.encoder.input.video.CameraCallbacks
 import com.pedro.library.base.StreamBase
 import com.pedro.library.view.OpenGlView
 import com.pedro.rtspserver.server.RtspServer
@@ -22,11 +26,49 @@ class SingleRtspServerStream(
     Camera2Source(context),
     NoAudioSource()
 ) {
+    private val appContext = context
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
 
+    private companion object {
+        const val TAG = "SingleRtspServerStream"
+    }
+
     init {
         rtspServer.setOnlyVideo(true)
+        // Observe camera startup and advertised AE capabilities without changing
+        // RootEncoder's capture requests or the camera lifecycle.
+        (videoSource as Camera2Source).setCameraCallback(object : CameraCallbacks {
+            override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) {
+                Log.i(TAG, "Camera changed: facing=$facing")
+            }
+
+            override fun onCameraError(error: String) {
+                Log.e(TAG, "Camera error: $error")
+            }
+
+            override fun onCameraOpened() {
+                val source = videoSource as Camera2Source
+                val cameraId = source.getCurrentCameraId()
+                runCatching {
+                    val manager = appContext.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+                    val characteristics = manager.getCameraCharacteristics(cameraId)
+                    Log.i(
+                        TAG,
+                        "Camera opened: id=$cameraId, facing=${source.getCameraFacing()}, " +
+                            "controlModes=${characteristics.get(CameraCharacteristics.CONTROL_AVAILABLE_MODES)?.contentToString()}, " +
+                            "aeModes=${characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)?.contentToString()}, " +
+                            "aeCompensationRange=${characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)}"
+                    )
+                }.onFailure {
+                    Log.w(TAG, "Unable to read AE capabilities for camera id=$cameraId", it)
+                }
+            }
+
+            override fun onCameraDisconnected() {
+                Log.w(TAG, "Camera disconnected")
+            }
+        })
     }
 
     fun startStream() {

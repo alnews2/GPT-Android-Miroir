@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+- prévention des redémarrages inutiles de la prévisualisation lorsque `surfaceChanged` suit `surfaceCreated`, avec suivi du flux actuellement attaché.
+- retour à RootEncoder 2.6.1 et ajout de journaux non intrusifs sur l'ouverture de la caméra à caméra unique et les modes AE annoncés, sans modifier les requêtes de capture ; les valeurs d'exposition réelles par image restent à diagnostiquer séparément.
 - ajout du zoom par pincement à deux doigts, appliqué à la capture pour l'aperçu et le flux RTSP, en portrait comme en paysage.
 - ajout du titre « Miroir Android » en haut de la fenêtre principale et d'une nouvelle icône adaptative évoquant le téléphone, la caméra et le miroir.
 - adoption de SemVer et des Conventional Commits pour déterminer automatiquement le niveau de version publié.
