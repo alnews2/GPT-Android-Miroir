@@ -46,7 +46,7 @@ class SingleRtspServerStream(
                 Log.e("SingleRtspServerStream", "Camera2 error: $error")
             }
             override fun onCameraDisconnected() {
-                Log.w(TAG, "Camera2 disconnected")
+                Log.w("SingleRtspServerStream", "Camera2 disconnected")
             }
         })
     }
