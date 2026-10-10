@@ -42,19 +42,43 @@ class SingleRtspServerStream(
             override fun onFrameCaptured(frameNumber: Long, timestamp: Long) {
                 if (!needsAutomaticExposure) return
 
-                val accepted = camera.enableAutoExposure()
-                if (accepted) {
+                // First use RootEncoder's supported AE API, then explicitly configure
+                // the repeating request so AE cannot remain locked from a prior session.
+                val aeEnabled = camera.enableAutoExposure()
+                val requestApplied = aeEnabled && camera.setCustomRequest { request ->
+                    request.set(
+                        android.hardware.camera2.CaptureRequest.CONTROL_MODE,
+                        android.hardware.camera2.CaptureRequest.CONTROL_MODE_AUTO
+                    )
+                    request.set(
+                        android.hardware.camera2.CaptureRequest.CONTROL_AE_MODE,
+                        android.hardware.camera2.CaptureRequest.CONTROL_AE_MODE_ON
+                    )
+                    request.set(
+                        android.hardware.camera2.CaptureRequest.CONTROL_AE_LOCK,
+                        false
+                    )
+                    request.set(
+                        android.hardware.camera2.CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,
+                        0
+                    )
+                }
+
+                if (aeEnabled && requestApplied && camera.isAutoExposureEnabled()) {
                     needsAutomaticExposure = false
                     Log.i(
                         TAG,
-                        "Camera2 automatic exposure enabled: cameraId=${camera.getCurrentCameraId()}, " +
-                            "frame=$frameNumber, enabled=${camera.isAutoExposureEnabled()}"
+                        "Camera2 AE request applied: cameraId=${camera.getCurrentCameraId()}, " +
+                            "frame=$frameNumber, controlMode=AUTO, aeMode=ON, aeLock=false, " +
+                            "exposureCompensation=0, apiEnabled=${camera.isAutoExposureEnabled()}. " +
+                            "RootEncoder 2.6.6 does not expose TotalCaptureResult for this single-camera source."
                     )
                 } else {
                     Log.e(
                         TAG,
-                        "Camera2 rejected automatic exposure: cameraId=${camera.getCurrentCameraId()}, " +
-                            "running=${camera.isRunning()}; will retry"
+                        "Camera2 AE request incomplete: cameraId=${camera.getCurrentCameraId()}, " +
+                            "running=${camera.isRunning()}, aeEnabled=$aeEnabled, " +
+                            "requestApplied=$requestApplied, apiEnabled=${camera.isAutoExposureEnabled()}; will retry"
                     )
                 }
             }
