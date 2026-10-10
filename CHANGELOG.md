@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
-- activation de l'exposition automatique (AE) dans le rappel d'ouverture effective de Camera2 en mode à caméra unique, avec journalisation du résultat et réapplication après changement de caméra ; activation également dans les requêtes Camera2 personnalisées du mode simultané, y compris après application du zoom.
+- activation de l'exposition automatique (AE) après la première capture effectivement terminée en mode à caméra unique, avec journalisation du résultat et réapplication après changement de caméra ; activation également dans les requêtes Camera2 personnalisées du mode simultané, y compris après application du zoom.
 - ajout du zoom par pincement à deux doigts, appliqué à la capture pour l'aperçu et le flux RTSP, en portrait comme en paysage.
 - ajout du titre « Miroir Android » en haut de la fenêtre principale et d'une nouvelle icône adaptative évoquant le téléphone, la caméra et le miroir.
 - adoption de SemVer et des Conventional Commits pour déterminer automatiquement le niveau de version publié.
