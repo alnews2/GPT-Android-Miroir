@@ -1,9 +1,8 @@
 package fr.alnews2.gptandroidmiroir
 
 import android.content.Context
+import android.hardware.camera2.CaptureRequest
 import android.media.MediaCodec
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.pedro.common.AudioCodec
 import com.pedro.common.ConnectChecker
@@ -16,7 +15,6 @@ import com.pedro.library.view.OpenGlView
 import com.pedro.rtspserver.server.RtspServer
 import com.pedro.rtspserver.util.RtspServerStreamClient
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicBoolean
 
 class SingleRtspServerStream(
     context: Context,
@@ -29,43 +27,44 @@ class SingleRtspServerStream(
 ) {
     private val rtspServer = RtspServer(connectChecker, port)
     private var zoomRatio = 1f
-    private val autoExposureAttempted = AtomicBoolean(false)
-    private val cameraHandler = Handler(Looper.getMainLooper())
 
     init {
         rtspServer.setOnlyVideo(true)
-        // Camera2 opens and configures its capture session asynchronously.
-        // Retry briefly after onCameraOpened(), because RootEncoder can notify
-        // that the device is open before its repeating capture session is ready.
-        (videoSource as Camera2Source).setCameraCallback(object : CameraCallbacks {
+
+        val camera = videoSource as Camera2Source
+
+        // Apply AE to every Camera2 capture request. Calling enableAutoExposure()
+        // after onCameraOpened() can still be too early: RootEncoder opens the
+        // device and configures its repeating capture session asynchronously.
+        // A custom request is retained by Camera2 and reapplied to subsequent
+        // requests, including after the camera is switched.
+        val customRequestAccepted = camera.setCustomRequest { request ->
+            request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            request.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+        }
+        if (customRequestAccepted) {
+            Log.i(TAG, "Automatic exposure requested for every Camera2 capture request")
+        } else {
+            Log.e(TAG, "RootEncoder rejected the automatic-exposure capture request")
+        }
+
+        camera.setCameraCallback(object : CameraCallbacks {
             override fun onCameraOpened() {
-                autoExposureAttempted.set(false)
-                enableAutoExposureWhenReady(attempt = 0)
+                Log.i(TAG, "Camera2 opened: ${camera.getCameraFacing()}, automatic exposure request installed")
             }
 
-            override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) = Unit
-            override fun onCameraError(error: String) {
-                Log.e("SingleRtspServerStream", "Camera2 error: $error")
+            override fun onCameraChanged(facing: com.pedro.encoder.input.video.CameraHelper.Facing) {
+                Log.i(TAG, "Camera2 changed to $facing; automatic exposure remains configured")
             }
+
+            override fun onCameraError(error: String) {
+                Log.e(TAG, "Camera2 error: $error")
+            }
+
             override fun onCameraDisconnected() {
-                Log.w("SingleRtspServerStream", "Camera2 disconnected")
+                Log.w(TAG, "Camera2 disconnected")
             }
         })
-    }
-
-    private fun enableAutoExposureWhenReady(attempt: Int) {
-        if (autoExposureAttempted.get()) return
-        val camera = videoSource as Camera2Source
-        if (camera.isRunning() && camera.enableAutoExposure()) {
-            autoExposureAttempted.set(true)
-            Log.i("SingleRtspServerStream", "Automatic exposure enabled for ${camera.getCameraFacing()}")
-            return
-        }
-        if (attempt < 10) {
-            cameraHandler.postDelayed({ enableAutoExposureWhenReady(attempt + 1) }, 100L)
-        } else {
-            Log.w("SingleRtspServerStream", "Automatic exposure could not be enabled after camera startup")
-        }
     }
 
     fun startStream() {
@@ -77,8 +76,6 @@ class SingleRtspServerStream(
     }
 
     fun switchCamera() {
-        // switchCamera() closes and reopens Camera2 asynchronously. The same
-        // onCameraOpened callback reapplies automatic exposure to the new lens.
         (videoSource as Camera2Source).switchCamera()
     }
 
@@ -129,5 +126,9 @@ class SingleRtspServerStream(
 
     override fun setAudioCodecImp(codec: AudioCodec) {
         rtspServer.setAudioCodec(codec)
+    }
+
+    private companion object {
+        const val TAG = "SingleRtspServerStream"
     }
 }
