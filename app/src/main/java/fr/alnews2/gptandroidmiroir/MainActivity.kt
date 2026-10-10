@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -42,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.pedro.encoder.utils.gl.AspectRatioMode
@@ -135,16 +137,33 @@ private fun CameraApp(onQuit: () -> Unit) {
             )
         }
 
-        CameraMenu(
-            onCameraSelected = {
-                cameraSelection = it
-                streamManager.selectCamera(it)
-                streamError = streamManager.lastError
-            },
-            onConfigureRtsp = { showRtspConfiguration = true },
-            onQuit = onQuit,
-            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()
-        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(56.dp)
+                .background(Color(0xFF0A3D91))
+                .padding(start = 16.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Miroir Android",
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            CameraMenu(
+                onCameraSelected = {
+                    cameraSelection = it
+                    streamManager.selectCamera(it)
+                    streamError = streamManager.lastError
+                },
+                onConfigureRtsp = { showRtspConfiguration = true },
+                onQuit = onQuit
+            )
+        }
     }
 
     if (showRtspConfiguration) {
