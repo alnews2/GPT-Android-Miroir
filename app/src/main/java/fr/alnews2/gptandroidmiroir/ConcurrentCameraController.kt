@@ -89,6 +89,7 @@ class ConcurrentCameraController(context: Context) {
                 }
                 session.setRepeatingRequest(
                     requestBuilder.build(),
+                    executor,
                     object : CameraCaptureSession.CaptureCallback() {
                         override fun onCaptureCompleted(
                             session: CameraCaptureSession,
@@ -97,8 +98,7 @@ class ConcurrentCameraController(context: Context) {
                         ) {
                             reportExposureResult(selection, result)
                         }
-                    },
-                    executor
+                    }
                 )
             }.onFailure {
                 lastError = "Zoom " + selection.name.lowercase() + " impossible : " + (it.message ?: "erreur Camera2")
@@ -239,6 +239,7 @@ class ConcurrentCameraController(context: Context) {
                                 }.build()
                             session.setRepeatingRequest(
                                 request,
+                                executor,
                                 object : CameraCaptureSession.CaptureCallback() {
                                     override fun onCaptureCompleted(
                                         session: CameraCaptureSession,
@@ -247,9 +248,8 @@ class ConcurrentCameraController(context: Context) {
                                     ) {
                                         reportExposureResult(selection, result)
                                     }
-                                },
-                                executor
-                            )
+                                }
+                )
                             Log.i(
                                 TAG,
                                 "${selection.name} AE request started: cameraId=$cameraId, " +
