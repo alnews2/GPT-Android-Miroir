@@ -1,8 +1,6 @@
 # Miroir Android
 
-Application Android autonome de prévisualisation caméra et de diffusion vidéo RTSP.
-
-Application Android standalone développée en Kotlin avec Jetpack Compose et un pipeline Camera2/RTSP.
+Application Android autonome développée en Kotlin avec Jetpack Compose et Camera2/RTSP, pour prévisualiser une caméra et diffuser la vidéo via RTSP.
 
 ## Fonctionnalités actuelles
 
