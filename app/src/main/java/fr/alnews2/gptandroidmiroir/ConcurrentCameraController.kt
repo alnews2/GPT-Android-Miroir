@@ -11,6 +11,8 @@ import android.graphics.Rect
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import java.util.concurrent.ExecutorService
@@ -21,6 +23,7 @@ class ConcurrentCameraController(context: Context) {
 
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val cameraCallbackHandler = Handler(Looper.getMainLooper())
     private val ids = mutableMapOf<CameraSelection, String>()
     private val targets = mutableMapOf<CameraSelection, Target>()
     private val devices = mutableMapOf<CameraSelection, CameraDevice>()
@@ -89,7 +92,6 @@ class ConcurrentCameraController(context: Context) {
                 }
                 session.setRepeatingRequest(
                     requestBuilder.build(),
-                    executor,
                     object : CameraCaptureSession.CaptureCallback() {
                         override fun onCaptureCompleted(
                             session: CameraCaptureSession,
@@ -99,7 +101,8 @@ class ConcurrentCameraController(context: Context) {
                             reportExposureResult(selection, result)
                         }
                     }
-                )
+                )    cameraCallbackHandler
+$3
             }.onFailure {
                 lastError = "Zoom " + selection.name.lowercase() + " impossible : " + (it.message ?: "erreur Camera2")
             }
@@ -239,7 +242,6 @@ class ConcurrentCameraController(context: Context) {
                                 }.build()
                             session.setRepeatingRequest(
                                 request,
-                                executor,
                                 object : CameraCaptureSession.CaptureCallback() {
                                     override fun onCaptureCompleted(
                                         session: CameraCaptureSession,
@@ -249,7 +251,8 @@ class ConcurrentCameraController(context: Context) {
                                         reportExposureResult(selection, result)
                                     }
                                 }
-                )
+                )    cameraCallbackHandler
+$3
                             Log.i(
                                 TAG,
                                 "${selection.name} AE request started: cameraId=$cameraId, " +
